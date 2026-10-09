@@ -25,3 +25,33 @@ impl JavaScriptRuntime {
             .map_err(|error| format!("Result conversion failed: {error}"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::JavaScriptRuntime;
+
+    #[test]
+    fn runtime_recovers_after_execution_and_conversion_errors() -> Result<(), String> {
+        let mut runtime = JavaScriptRuntime::new()?;
+
+        assert_eq!(runtime.execute_i64("globalThis.counter = 0")?, 0);
+
+        let execution_error = runtime
+            .execute_i64("throw new Error('intentional test error')")
+            .expect_err("A JavaScript exception should return Err");
+
+        assert!(execution_error.starts_with("JavaScript execution failed:"));
+
+        assert_eq!(runtime.execute_i64("++globalThis.counter")?, 1);
+
+        let conversion_error = runtime
+            .execute_i64("({ value: 42 })")
+            .expect_err("An object result should fail conversion to i64");
+
+        assert!(conversion_error.starts_with("Result conversion failed:"));
+
+        assert_eq!(runtime.execute_i64("++globalThis.counter")?, 2);
+
+        Ok(())
+    }
+}

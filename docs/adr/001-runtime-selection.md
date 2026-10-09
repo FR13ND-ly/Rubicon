@@ -140,7 +140,24 @@ First execution: 1
 Second execution: 2
 ```
 
-This verifies sequential reuse and persistence of JavaScript global state within one runtime. It also demonstrates why request data must later be scoped explicitly: a reused execution context retains globals between calls. Separate-instance isolation, recovery after JavaScript exceptions or conversion failures, worker scheduling, ES modules, asynchronous work, Angular SSR, and performance remain unverified. Linker warning LNK4098 persists. The ADR remains Draft.
+This verified sequential reuse and persistence of JavaScript global state within one runtime. It also demonstrated why request data must later be scoped explicitly: a reused execution context retains globals between calls. At that milestone, separate-instance isolation, recovery after JavaScript exceptions or conversion failures, worker scheduling, ES modules, asynchronous work, Angular SSR, and performance were unverified. Linker warning LNK4098 persisted. The ADR remained Draft.
+
+### Continuing After Synchronous Errors
+
+On 2026-10-09, the author added the regression test `runtime_recovers_after_execution_and_conversion_errors`. It uses one runtime on one thread for the entire sequence: initialize a counter, execute a script that throws an ordinary JavaScript exception, increment the counter, evaluate an object that cannot be converted to `i64`, and increment the counter again.
+
+The test checks the execution and conversion error categories separately and requires the counter increments to return 1 and 2 after the respective failures. This verifies error propagation and subsequent valid execution without replacing the runtime or resetting its global state.
+
+The following checks completed successfully:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml --lib
+```
+
+The test result was one passed, zero failed. Linker warning LNK4098 also occurred when building the test executable and remains unresolved. Test harness duration is not performance evidence.
+
+This verification covers the specific ordinary synchronous exception and conversion failure used in the test. It does not establish rollback of script side effects, recovery from resource exhaustion or termination, asynchronous rejection handling, request cleanup, separate-instance isolation, or Angular SSR compatibility. The ADR remains Draft.
 
 ## Decision History
 
@@ -149,3 +166,4 @@ This verifies sequential reuse and persistence of JavaScript global state within
 | 2026-10-09 | Draft created and expanded. | Record deno_core as a prototype candidate, alternatives, and validation conditions. |
 | 2026-10-09 | Record first synchronous execution and selected deno_core version. | Preserve the verified result, exact checks, unresolved linker warning, and remaining compatibility work. |
 | 2026-10-09 | Record reuse of one runtime instance. | Verify sequential execution and retained global state while keeping request isolation and performance claims separate. |
+| 2026-10-09 | Record continued execution after synchronous errors. | Verify execution and conversion error propagation and valid subsequent execution on the same runtime. |
