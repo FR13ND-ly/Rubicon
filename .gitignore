@@ -1,0 +1,4 @@
+# Rust build artifacts; applies to target directories at any depth.
+target/
+
+# Cargo.lock remains versioned for reproducible project builds.

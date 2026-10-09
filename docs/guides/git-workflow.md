@@ -33,6 +33,43 @@ git diff --cached
 
 An untracked file will not appear in a normal diff until staged; inspect its contents directly. Include relevant specifications and ADR updates with implementation changes.
 
+## Commit Every Completed Step
+
+Rubicon's history should explain the development of the thesis project. Make one focused commit for each completed, verifiable step. A step may establish project structure, add an executable, prove a runtime capability, fix a failure, or document a decision. Separate independent steps into separate commits.
+
+The project author writes application and framework code. Assistant support may include explanations, review, checks, documentation, and Git operations. Commit descriptions must describe the actual changes and verification without implying that a scaffold already implements SSR.
+
+For each step:
+
+1. Define the expected observable result before implementation.
+2. Inspect the author's changes and preserve unrelated or unfinished work.
+3. Run checks appropriate to that step and resolve relevant failures.
+4. Update affected documentation when a behavior, contract, or decision changes.
+5. Stage explicit files and inspect the staged diff.
+6. Create a conventional commit with the reason, changes, validation, and remaining limitations in its body.
+
+A commit message should use this structure:
+
+```text
+type(scope): describe the completed step
+
+Reason: explain why this step is needed.
+
+Changes: identify the concrete behavior or structure added.
+
+Validation: record the exact checks and observed outcomes.
+
+Limitations: identify unfinished behavior or follow-up work.
+```
+
+Keep descriptions proportional to the change, but retain enough detail to reconstruct the reasoning. Examples of future steps include `chore(rust): initialize Rubicon library crate`, `feat(cli): call the library from the executable`, and `feat(runtime): execute the first JavaScript script`. These examples are plans, not claims that the steps are implemented.
+
+Only claim checks that actually ran. A library-only check does not establish that an executable builds or that the renderer works. Record temporary checks used during early integration. Commit Cargo.lock for reproducible project builds and exclude generated target directories through the root .gitignore.
+
+Incomplete files may remain in the working tree while an independently completed step is committed. Identify them in the handoff and do not stage them accidentally. Never fabricate earlier milestones or backdate commits to reconstruct work that was not recorded.
+
+Review progress using `git log --oneline` for the sequence and `git show <commit>` for the reasoning and diff. Local commits and remote publication are separate checkpoints; push when requested by the author. Associate benchmark evidence with the exact tested commit.
+
 ## Integrating Upstream Changes
 
 Fetch and inspect upstream changes before deciding how to integrate them. Rebase can keep a private feature branch easy to review, but rewrites commit history. Coordinate before rewriting a branch shared with collaborators.
