@@ -14,7 +14,7 @@ See the [template catalog](templates/readme.md) for specification, architecture 
 
 ## Project Documents
 
-The following documents contain initial drafts for author review. Specifications describe proposed behavior; the runtime ADR records a prototype candidate. Implementation and performance evaluation have not started:
+The following documents contain initial drafts for author review. Specifications describe proposed behavior; the runtime ADR records a prototype candidate. Angular SSR integration and performance evaluation have not started:
 
 1. [Project overview](specs/project-overview.md)
 2. [Architecture](specs/architecture.md)
