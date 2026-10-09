@@ -18,6 +18,14 @@ The demonstration module returns `<h1>Rubicon</h1><p>Render N</p>`, with a count
 
 The module path currently uses the crate's build-time source directory. Worker configuration, asynchronous renderer verification, request isolation, deadline enforcement, graceful shutdown, deployable artifact packaging, and Angular SSR remain future steps. Linker warning LNK4098 persists; performance has not been measured.
 
-A regression test verifies that a JavaScript exception and an object-to-integer conversion failure return errors, and that the same runtime continues executing valid scripts with its counter state preserved after each failure.
+The tests verify continued execution after synchronous script errors, rejection of a render when the queue is full, and continued worker execution after an exported JavaScript function throws or returns a non-string value. The worker integration check uses [renderer_errors.rs](crates/rubicon/tests/renderer_errors.rs) and a controlled [JavaScript fixture](crates/rubicon/tests/fixtures/renderer_errors.mjs); successful calls return counter values 1, 3, and 5 across the two failures.
+
+Run the complete test suite with:
+
+```text
+cargo test --locked --manifest-path crates/rubicon/Cargo.toml
+```
+
+The integration target has its own `main` (`harness = false`) so it initializes the V8 platform before starting its worker. The test time limits bound asynchronous waits; they do not establish active JavaScript interruption or graceful worker shutdown. HTTP error mapping, load behavior, and request isolation still require separate verification.
 
 Start with the [documentation index](docs/readme.md), the [writing guide](docs/guides/how-to-document.md), and the [documentation templates](docs/templates/readme.md).

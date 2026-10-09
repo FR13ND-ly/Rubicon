@@ -106,3 +106,32 @@ fn run_worker(
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{QUEUE_CAPACITY, RenderError, RenderJob, Renderer};
+    use tokio::sync::{mpsc, oneshot};
+
+    #[tokio::test]
+    async fn full_queue_rejects_render_without_waiting_for_capacity() {
+        let (sender, receiver) = mpsc::channel(QUEUE_CAPACITY);
+        let renderer = Renderer { sender };
+        let mut pending_replies = Vec::new();
+
+        for _ in 0..QUEUE_CAPACITY {
+            let (reply, response) = oneshot::channel();
+
+            assert!(renderer.sender.try_send(RenderJob { reply }).is_ok());
+            pending_replies.push(response);
+        }
+
+        let result = tokio::time::timeout(Duration::from_secs(2), renderer.render())
+            .await
+            .expect("A full queue must reject the request without waiting for capacity");
+
+        assert!(matches!(result, Err(RenderError::Busy)));
+        assert_eq!(receiver.len(), QUEUE_CAPACITY);
+    }
+}

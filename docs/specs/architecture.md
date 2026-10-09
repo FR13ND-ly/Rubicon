@@ -159,11 +159,11 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 | --- | --- | --- | --- |
 | ARCH-01, ARCH-03 | Inspect component boundaries and run the consuming example. | Library and adapter integration review. | Planned |
 | ARCH-02 | Exercise missing artifacts, invalid configuration, and startup readiness. | Startup checks. | Planned |
-| ARCH-04 | Offer work above capacity and inspect admission and queue counts. | Scheduler checks and overload run. | Planned |
+| ARCH-04 | Offer work above capacity and inspect admission and queue counts. | Scheduler checks and overload run. | Partial: controlled queue rejection verified; configured scheduling and HTTP overload planned. |
 | ARCH-05 | Alternate identities and verify cleanup after successful and failed renders. | Isolation checks and sustained-operation run. | Planned |
 | ARCH-06 | Exercise service success, failure, and late completion. | Native-service integration checks. | Planned |
 | ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Planned |
-| ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Planned |
+| ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Partial: continued execution after ordinary renderer errors verified; cancellation and shutdown planned. |
 
 ### Initial HTTP Host Verification
 
@@ -200,6 +200,26 @@ Both returned `200 OK` and `Content-Type: text/html; charset=utf-8`. The bodies 
 Queue overload, worker-channel closure, startup failure, and HTTP error paths have not been exercised by these repository HTTP checks. The prototype's readiness handshake is limited to module initialization. The worker thread handle is detached; there is no implemented join or graceful shutdown policy, render deadline, runtime replacement, or interruption of active JavaScript. A queued job whose reply receiver has closed is skipped, but this does not cancel an active render.
 
 Full acceptance of ARCH-02, ARCH-04, ARCH-05, ARCH-07, and ARCH-08 still requires configuration, failure, isolation, complete response-contract, and lifecycle verification. Angular SSR and benchmark results remain unimplemented.
+
+### Queue Rejection and Renderer Error Verification
+
+On 2026-10-10, the author added a queue unit test to `src/renderer.rs` and a separate [worker integration target](../../crates/rubicon/tests/renderer_errors.rs), supported by a controlled [JavaScript fixture](../../crates/rubicon/tests/fixtures/renderer_errors.mjs). Tokio's `time` feature is now explicit. The integration target uses `harness = false` and its own current-thread Tokio `main`, initializing the V8 platform before starting the worker.
+
+The queue test fills all 16 slots while retaining the receiver without consuming jobs. Calling `Renderer::render` must return `RenderError::Busy` within the test's two-second wait limit, and the queue must still contain exactly 16 jobs. This verifies the library admission behavior under controlled full-queue conditions; it is not an HTTP overload or latency measurement.
+
+The integration check initializes one `Renderer` and invokes it five times. Calls 1, 3, and 5 return `<p>Render 1</p>`, `<p>Render 3</p>`, and `<p>Render 5</p>`. Call 2 throws an intentional JavaScript exception, and call 4 returns an object that cannot be converted to a Rust string. Both failures must arrive as `RenderError::Failed` with the expected error category. The subsequent valid results verify continued execution and retained module state after each ordinary failure.
+
+The following checks completed successfully:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+The library reported two tests passed and zero failed. The standalone integration executable completed with `Renderer error checks passed.`; the binary and documentation test harnesses contained zero tests. Linker warning LNK4098 persists in the test and application targets.
+
+The five-second integration limits apply to startup and individual asynchronous render waits. They do not implement cancellation of active JavaScript, recovery after engine termination or resource exhaustion, or a bounded worker join. Dropping `Renderer` does not prove graceful shutdown. HTTP 500/503 mapping, worker-channel closure, startup-failure paths, request isolation, and load behavior remain unverified by these checks. These results do not establish performance improvements or full acceptance of ARCH-04 or ARCH-08.
 
 ## Open Questions
 

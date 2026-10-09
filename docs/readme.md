@@ -14,7 +14,7 @@ See the [template catalog](templates/readme.md) for specification and architectu
 
 ## Project Documents
 
-The following documents contain initial drafts for author review. Specifications describe proposed behavior; the architecture records the verified HTTP-to-JavaScript worker prototype, and the runtime ADR records verified capabilities including local ES module loading and repeated calls returning HTML. Request isolation, Angular SSR integration, and performance evaluation remain future work:
+The following documents contain initial drafts for author review. Specifications describe proposed behavior; the architecture records the verified HTTP-to-JavaScript worker prototype, its queue rejection check, and continued execution after ordinary renderer errors. The runtime ADR records verified capabilities including local ES module loading and repeated calls returning HTML. Request isolation, Angular SSR integration, and performance evaluation remain future work:
 
 1. [Project overview](specs/project-overview.md)
 2. [Architecture](specs/architecture.md)
