@@ -1,4 +1,7 @@
-fn main() {
-    let result = rubicon::add(4, 2);
-    println!("The sum is: {}", result);
+fn main() -> Result<(), String> {
+    let result = rubicon::execute_javascript("4 + 2")?;
+
+    println!("JavaScript result: {result}");
+
+    Ok(())
 }

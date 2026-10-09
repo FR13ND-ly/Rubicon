@@ -104,17 +104,34 @@ If a significant accepted decision is later superseded, create a replacement ADR
 - [Rendering contract](../specs/rendering-contract.md).
 - [Benchmark protocol](../specs/benchmark-protocol.md).
 - [Deno Core README](https://github.com/denoland/deno/blob/main/libs/core/README.md), rolling main branch checked on 2026-10-09.
-- [deno_core JsRuntime](https://docs.rs/deno_core/latest/deno_core/struct.JsRuntime.html), documentation observed at 0.412.0 on 2026-10-09; selected dependency version TBD.
+- [deno_core JsRuntime](https://docs.rs/deno_core/latest/deno_core/struct.JsRuntime.html), documentation observed at 0.412.0 on 2026-10-09; the first synchronous execution prototype pins deno_core to 0.412.0 in Cargo.toml and records resolved dependencies in Cargo.lock.
 - [Deno runtime implementation](https://docs.rs/deno_runtime/latest/src/deno_runtime/worker.rs.html), rolling latest documentation checked on 2026-10-09; selected dependency version TBD.
 - [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-09; selected Angular version TBD.
 - [Bun Rust rewrite announcement](https://bun.com/blog/bun-in-rust), checked on 2026-10-09.
 - [Official Bun embedding feature request](https://github.com/oven-sh/bun/issues/12017), open status checked on 2026-10-09.
 - [Community libbun project](https://github.com/enki/libbun), project claims and documented integration checked on 2026-10-09; no local validation performed.
 
-These sources support the option descriptions. They do not establish this project's compatibility or performance. Exact dependency versions and source commits must be recorded when implementation begins.
+These sources support the option descriptions. They do not establish this project's Angular compatibility or performance. Record exact dependency versions and source commits for each subsequent prototype and experiment.
+
+### First Synchronous Execution Prototype
+
+On 2026-10-09, the author's Rust implementation successfully evaluated `4 + 2` through deno_core 0.412.0, converted the V8 result to a Rust `i64`, and printed `JavaScript result: 6` from the executable. Initialization, execution, and conversion errors are mapped to strings and propagated through `Result`; their failure paths have not yet been exercised in this validation.
+
+The following checks completed successfully:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml
+cargo run --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+The executable build emitted linker warning LNK4098 about `libcmt.lib` conflicting with other libraries. Execution still completed successfully; the warning remains unresolved and should be investigated before treating this build configuration as a benchmark reference.
+
+This prototype creates and drops a runtime for every function call. It establishes synchronous engine embedding and numeric result conversion only. Persistent runtime reuse, ES modules, asynchronous work, Angular SSR, hydration, request isolation, and performance remain unverified. This evidence does not change the ADR's Draft status.
 
 ## Decision History
 
 | Date | Change | Reason |
 | --- | --- | --- |
 | 2026-10-09 | Draft created and expanded. | Record deno_core as a prototype candidate, alternatives, and validation conditions. |
+| 2026-10-09 | Record first synchronous execution and selected deno_core version. | Preserve the verified result, exact checks, unresolved linker warning, and remaining compatibility work. |
