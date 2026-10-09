@@ -159,6 +159,30 @@ The test result was one passed, zero failed. Linker warning LNK4098 also occurre
 
 This verification covers the specific ordinary synchronous exception and conversion failure used in the test. It does not establish rollback of script side effects, recovery from resource exhaustion or termination, asynchronous rejection handling, request cleanup, separate-instance isolation, or Angular SSR compatibility. The ADR remains Draft.
 
+### Local ES Module Returning HTML
+
+On 2026-10-09, the author configured `FsModuleLoader`, added `load_main_module` and `call_string_export`, and pinned Tokio 1.53.2 as a direct dependency with the `rt` and `macros` features. The executable uses Tokio's current-thread runtime, loads `js/render.mjs` once, evaluates it while driving the JavaScript event loop, and calls its exported `render()` function twice on the same embedded runtime.
+
+The module exports a synchronous function returning `<h1>Rubicon</h1>`. Each call looks up the function in the evaluated module namespace, drives the call future with the JavaScript event loop, and converts the returned V8 value to a Rust `String`. Module path resolution starts from the package's compile-time manifest directory, avoiding dependence on the shell's current directory. The file loader uses synchronous filesystem reads during module loading; this prototype performs that loading before the two render calls.
+
+The following checks completed successfully:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml --lib
+cargo run --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+The existing synchronous-error regression test still passed, with one test passed and zero failed. Execution produced:
+
+```text
+First render: <h1>Rubicon</h1>
+Second render: <h1>Rubicon</h1>
+```
+
+This verifies local module loading, evaluation, exported-function access, repeated invocation, and HTML string transfer to Rust. The Rust orchestration is asynchronous, but the tested JavaScript renderer is synchronous. Promise-returning renderers, import graphs, module failure recovery, HTTP serving, worker scheduling, Angular SSR, hydration, request isolation, and performance remain unverified. Linker warning LNK4098 persists in both the test executable and application executable. The ADR remains Draft.
+
 ## Decision History
 
 | Date | Change | Reason |
@@ -167,3 +191,4 @@ This verification covers the specific ordinary synchronous exception and convers
 | 2026-10-09 | Record first synchronous execution and selected deno_core version. | Preserve the verified result, exact checks, unresolved linker warning, and remaining compatibility work. |
 | 2026-10-09 | Record reuse of one runtime instance. | Verify sequential execution and retained global state while keeping request isolation and performance claims separate. |
 | 2026-10-09 | Record continued execution after synchronous errors. | Verify execution and conversion error propagation and valid subsequent execution on the same runtime. |
+| 2026-10-09 | Record local ES module loading and HTML return values. | Verify loading once and calling the synchronous exported renderer twice through asynchronous Rust orchestration. |
