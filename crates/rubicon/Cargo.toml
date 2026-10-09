@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+axum = "=0.8.9"
 deno_core = "=0.412.0"
-tokio = { version = "=1.53.2", features = ["rt", "macros"] }
+tokio = { version = "=1.53.2", features = ["rt", "macros", "rt-multi-thread", "net"] }

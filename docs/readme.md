@@ -14,7 +14,7 @@ See the [template catalog](templates/readme.md) for specification, architecture 
 
 ## Project Documents
 
-The following documents contain initial drafts for author review. Specifications describe proposed behavior; the runtime ADR records a prototype candidate and verified runtime capabilities, including local ES module loading and repeated calls returning HTML. Angular SSR integration and performance evaluation have not started:
+The following documents contain initial drafts for author review. Specifications describe proposed behavior; the architecture records the verified initial HTTP host, and the runtime ADR records verified capabilities including local ES module loading and repeated calls returning HTML. Connecting HTTP to the renderer, Angular SSR integration, and performance evaluation remain future work:
 
 1. [Project overview](specs/project-overview.md)
 2. [Architecture](specs/architecture.md)

@@ -2,8 +2,8 @@
 
 **Status:** Draft
 **Created:** 2026-10-09
-**Last updated:** 2026-10-09
-**Implementation:** Not started
+**Last updated:** 2026-10-10
+**Implementation:** Initial runtime and HTTP prototypes; Angular SSR not implemented
 
 ## Purpose and Context
 
@@ -146,6 +146,24 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 | ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Planned |
 | ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Planned |
 
+### Initial HTTP Host Verification
+
+On 2026-10-10, the author added Axum 0.8.9 and enabled Tokio's multi-thread runtime and network features. The executable binds to `127.0.0.1:3000`, routes `GET /` to a handler returning `Html`, and serves requests through `axum::serve`. The response body is the fixed Rust string `<h1>Rubicon</h1>`; the HTTP handler does not yet invoke the JavaScript renderer.
+
+The following checks completed successfully:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml --lib
+cargo build --locked --offline --manifest-path crates/rubicon/Cargo.toml
+curl.exe --max-time 5 -sS -i http://127.0.0.1:3000/
+```
+
+The HTTP check used the author's already-running server and observed `200 OK`, `Content-Type: text/html; charset=utf-8`, and the exact body `<h1>Rubicon</h1>`. The existing runtime regression test passed, with one test passed and zero failed. Linker warning LNK4098 persists in the library test executable; no linker warning was emitted by the application build during this validation.
+
+These checks verify the initial HTTP scaffold, not acceptance of the complete architecture requirements. ARCH-07 still requires connection to the renderer and verification of its response semantics. Worker scheduling, readiness, request isolation, graceful shutdown, Angular SSR, and performance remain unverified.
+
 ## Open Questions
 
 | Question | Impact | Next action |
@@ -163,6 +181,7 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 - [Benchmark protocol](benchmark-protocol.md).
 - [ADR 001: JavaScript runtime selection](../adr/001-runtime-selection.md).
 - [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-09; selected Angular version TBD.
-- [deno_core JsRuntime](https://docs.rs/deno_core/latest/deno_core/struct.JsRuntime.html), documentation observed at 0.412.0 on 2026-10-09; selected dependency version TBD.
+- [deno_core JsRuntime](https://docs.rs/deno_core/latest/deno_core/struct.JsRuntime.html), documentation observed at 0.412.0 on 2026-10-09; prototype dependency pinned to 0.412.0.
+- [Axum serve API](https://docs.rs/axum/latest/axum/fn.serve.html), rolling documentation observed at 0.8.9 on 2026-10-10; prototype dependency pinned to 0.8.9.
 - [Angular library creation](https://angular.dev/tools/libraries/creating-libraries), rolling documentation checked on 2026-10-09.
 - [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html), rolling documentation checked on 2026-10-09.

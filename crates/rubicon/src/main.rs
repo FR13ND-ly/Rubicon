@@ -1,19 +1,18 @@
-use std::path::Path;
+use axum::{Router, response::Html, routing::get};
 
-use rubicon::JavaScriptRuntime;
+#[tokio::main]
+async fn main() -> Result<(), std::io::Error> {
+    let app = Router::new().route("/", get(root));
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), String> {
-    let mut runtime = JavaScriptRuntime::new()?;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
 
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("js/render.mjs");
-    let module_id = runtime.load_main_module(&path).await?;
+    println!("Rubicon is running at http://127.0.0.1:3000");
 
-    let first_html = runtime.call_string_export(module_id, "render").await?;
-    let second_html = runtime.call_string_export(module_id, "render").await?;
-
-    println!("First render: {first_html}");
-    println!("Second render: {second_html}");
+    axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+async fn root() -> Html<&'static str> {
+    Html("<h1>Rubicon</h1>")
 }
