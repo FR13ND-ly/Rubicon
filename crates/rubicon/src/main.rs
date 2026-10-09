@@ -1,7 +1,15 @@
 use std::path::Path;
 
-use axum::{Router, extract::State, http::StatusCode, response::Html, routing::get};
+use axum::{
+    Router,
+    extract::{OriginalUri, State},
+    http::StatusCode,
+    response::Html,
+    routing::get,
+};
 use rubicon::{RenderError, Renderer};
+
+const APPLICATION_ORIGIN: &str = "http://127.0.0.1:3000";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -11,13 +19,16 @@ async fn main() -> Result<(), String> {
 
     let renderer = Renderer::start(module_path).await?;
 
-    let app = Router::new().route("/", get(root)).with_state(renderer);
+    let app = Router::new()
+        .route("/", get(root))
+        .route("/{*path}", get(root))
+        .with_state(renderer);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
         .map_err(|error| format!("HTTP listener creation failed: {error}"))?;
 
-    println!("Rubicon is running at http://127.0.0.1:3000");
+    println!("Rubicon is running at {APPLICATION_ORIGIN}");
 
     axum::serve(listener, app)
         .await
@@ -28,8 +39,16 @@ async fn main() -> Result<(), String> {
 
 async fn root(
     State(renderer): State<Renderer>,
+    OriginalUri(uri): OriginalUri,
 ) -> Result<Html<String>, (StatusCode, &'static str)> {
-    match renderer.render().await {
+    let path_and_query = uri
+        .path_and_query()
+        .map(|value| value.as_str())
+        .unwrap_or("/");
+
+    let url = format!("{APPLICATION_ORIGIN}{path_and_query}");
+
+    match renderer.render(url).await {
         Ok(html) => Ok(Html(html)),
 
         Err(RenderError::Busy) => Err((StatusCode::SERVICE_UNAVAILABLE, "Server busy. Try again.")),

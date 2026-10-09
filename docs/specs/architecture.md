@@ -38,7 +38,7 @@ The current executable initializes the V8 platform on the main thread and starts
 
 Startup waits for a one-shot module-initialization result before binding the HTTP listener. This confirms runtime creation and module evaluation; the `render` export is checked when invoked, so this handshake does not establish full application rendering readiness.
 
-Axum stores a cloneable `Renderer` in application state. A `GET /` handler submits a job through a bounded Tokio `mpsc` channel and waits for that job's `oneshot` reply. The worker calls the module's zero-argument `render` export, converts the result to a Rust string, and returns it to the handler as buffered HTML.
+Axum stores a cloneable `Renderer` in application state. GET handlers for `/` and `/{*path}` extract `OriginalUri`, combine its path and query with the fixed origin `http://127.0.0.1:3000`, and submit the resulting URL through a bounded Tokio `mpsc` channel. Each handler waits for its job's `oneshot` reply. The worker passes the URL as a V8 string value to the module's `render(url)` export, converts the result to a Rust string, and returns it to the handler as buffered HTML.
 
 The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one job at a time. Submission uses `try_send`, so a full queue is rejected immediately rather than creating additional tasks waiting to enqueue. This bounds queued render jobs, not all HTTP connections or total process memory. The value is provisional and has not been tuned by benchmarks.
 
@@ -49,7 +49,7 @@ The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one 
 | Worker channel or reply channel closed | 503 with a generic unavailable response. |
 | Export execution or result conversion fails | 500 with a generic failure response; details are logged server-side. |
 
-The demonstration module maintains a render counter to show engine and module persistence. The job does not yet carry request information, and retaining this diagnostic counter does not verify isolation of user data. The following Angular request flow remains a proposal.
+The demonstration module displays the URL using HTML text escaping and maintains a render counter to show engine and module persistence. A job currently carries only the URL field of the proposed request model. Retaining this diagnostic counter and returning the current URL do not verify isolation of user data or request cleanup. The following Angular request flow remains a proposal.
 
 ### Proposed Components
 
@@ -111,7 +111,7 @@ Angular remains responsible for matching application routes during rendering. Th
 | Worker to Angular adapter | Serializable request information and scoped service access | Response, no matching route, or failure | The worker reports the failure and cleans up. |
 | Adapter to native service | Request-scoped operation and arguments | Data or explicit error | Late results cannot affect a different request. |
 
-The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. Configuration format, module export names, and service-operation names remain TBD; they must be documented once the prototype establishes a working integration.
+The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The demonstration currently uses `render(url)`; configuration format, the complete Angular adapter interface, and service-operation names remain TBD.
 
 The initial response is buffered HTML. The matching browser artifacts must come from the same application build. Any HTML processing must preserve the structure and state required for hydration.
 
@@ -162,7 +162,7 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 | ARCH-04 | Offer work above capacity and inspect admission and queue counts. | Scheduler checks and overload run. | Partial: controlled queue rejection verified; configured scheduling and HTTP overload planned. |
 | ARCH-05 | Alternate identities and verify cleanup after successful and failed renders. | Isolation checks and sustained-operation run. | Planned |
 | ARCH-06 | Exercise service success, failure, and late completion. | Native-service integration checks. | Planned |
-| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Planned |
+| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: URL propagation and successful HTML delivery verified; complete response contract planned. |
 | ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Partial: continued execution after ordinary renderer errors verified; cancellation and shutdown planned. |
 
 ### Initial HTTP Host Verification
@@ -207,7 +207,7 @@ On 2026-10-10, the author added a queue unit test to `src/renderer.rs` and a sep
 
 The queue test fills all 16 slots while retaining the receiver without consuming jobs. Calling `Renderer::render` must return `RenderError::Busy` within the test's two-second wait limit, and the queue must still contain exactly 16 jobs. This verifies the library admission behavior under controlled full-queue conditions; it is not an HTTP overload or latency measurement.
 
-The integration check initializes one `Renderer` and invokes it five times. Calls 1, 3, and 5 return `<p>Render 1</p>`, `<p>Render 3</p>`, and `<p>Render 5</p>`. Call 2 throws an intentional JavaScript exception, and call 4 returns an object that cannot be converted to a Rust string. Both failures must arrive as `RenderError::Failed` with the expected error category. The subsequent valid results verify continued execution and retained module state after each ordinary failure.
+At this milestone, the integration check initialized one `Renderer` and invoked it five times. Calls 1, 3, and 5 returned `<p>Render 1</p>`, `<p>Render 3</p>`, and `<p>Render 5</p>`. Call 2 threw an intentional JavaScript exception, and call 4 returned an object that could not be converted to a Rust string. Both failures arrived as `RenderError::Failed` with the expected error category. The subsequent valid results verified continued execution and retained module state after each ordinary failure.
 
 The following checks completed successfully:
 
@@ -220,6 +220,32 @@ cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
 The library reported two tests passed and zero failed. The standalone integration executable completed with `Renderer error checks passed.`; the binary and documentation test harnesses contained zero tests. Linker warning LNK4098 persists in the test and application targets.
 
 The five-second integration limits apply to startup and individual asynchronous render waits. They do not implement cancellation of active JavaScript, recovery after engine termination or resource exhaustion, or a bounded worker join. Dropping `Renderer` does not prove graceful shutdown. HTTP 500/503 mapping, worker-channel closure, startup-failure paths, request isolation, and load behavior remain unverified by these checks. These results do not establish performance improvements or full acceptance of ARCH-04 or ARCH-08.
+
+### Request URL HTTP Verification
+
+Later on 2026-10-10, the author extended the worker job and JavaScript call with an owned URL argument, added the `/{*path}` GET route, and used Axum's `OriginalUri` to preserve the path and query. The host constructs an absolute URL from the fixed local application origin. The demonstration module displays it with HTML text escaping.
+
+The worker integration fixture was updated to echo its argument on successful calls. Calls 1, 3, and 5 verify URLs A, B, and A respectively, while the intentional errors remain on calls 2 and 4. URL A is `http://127.0.0.1:3000/products?sort=asc&page=2`; URL B is `http://127.0.0.1:3000/search?q='quoted'&page=1`. Exact string comparisons exercise both query separators and apostrophes without embedding them in executable JavaScript source.
+
+The following checks completed successfully against the repository:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+curl.exe --max-time 5 -sS -i "http://127.0.0.1:3000/products?sort=asc&page=2" "http://127.0.0.1:3000/search?q=rust&lang=ro"
+```
+
+The library reported two tests passed and zero failed. The standalone integration executable completed with `Renderer URL and error checks passed.` The binary and documentation test harnesses contained zero tests. Linker warning LNK4098 persists in the test and application targets.
+
+Both requests to the author's already-running server returned `200 OK` and `Content-Type: text/html; charset=utf-8`. The observed bodies were:
+
+```html
+<h1>Rubicon</h1><p>URL: http://127.0.0.1:3000/products?sort=asc&amp;page=2</p><p>Render 3</p>
+<h1>Rubicon</h1><p>URL: http://127.0.0.1:3000/search?q=rust&amp;lang=ro</p><p>Render 4</p>
+```
+
+This verifies the request URL's passage through the HTTP handler, worker queue, V8 argument, and HTML result. The counter remains a module-persistence diagnostic. Methods, repeated headers, request identifiers, complete response outcomes, Angular rendering, user-data isolation, asynchronous JavaScript rendering, and lifecycle controls remain unverified or unimplemented. These are correctness checks and do not establish performance gains.
 
 ## Open Questions
 

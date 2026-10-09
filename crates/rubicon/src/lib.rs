@@ -69,13 +69,14 @@ impl JavaScriptRuntime {
         &mut self,
         module_id: ModuleId,
         export_name: &str,
+        argument: &str,
     ) -> Result<String, String> {
         let namespace = self
             .inner
             .get_module_namespace(module_id)
             .map_err(|error| format!("Module namespace access failed: {error}"))?;
 
-        let function = {
+        let (function, argument) = {
             deno_core::scope!(scope, &mut self.inner);
             let namespace = v8::Local::new(scope, namespace);
 
@@ -89,10 +90,19 @@ impl JavaScriptRuntime {
             let function = v8::Local::<v8::Function>::try_from(value)
                 .map_err(|_| format!("Export {export_name} must be a function"))?;
 
-            v8::Global::new(scope, function)
+            let argument = v8::String::new(scope, argument)
+                .ok_or_else(|| "Cannot allocate string argument".to_owned())?;
+
+            let argument: v8::Local<v8::Value> = argument.into();
+
+            (
+                v8::Global::new(scope, function),
+                v8::Global::new(scope, argument),
+            )
         };
 
-        let call = Box::pin(self.inner.call(&function));
+        let arguments = [argument];
+        let call = Box::pin(self.inner.call_with_args(&function, &arguments));
 
         let result = self
             .inner

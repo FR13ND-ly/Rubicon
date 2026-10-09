@@ -2,20 +2,20 @@
 
 **Status:** Draft
 **Created:** 2026-10-09
-**Last updated:** 2026-10-09
-**Implementation:** Not started
+**Last updated:** 2026-10-10
+**Implementation:** Partial URL-only prototype; Angular adapter not implemented
 
 ## Purpose and Context
 
 The rendering contract defines the boundary between the Rust HTTP host and the application's Angular renderer. It specifies request information, response outcomes, lifecycle responsibilities, and failure behavior.
 
-This is a semantic contract for the prototype. The exact Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
+This is a semantic contract for the intended prototype. The current implementation passes a URL string to a JavaScript `render(url)` export and receives an HTML string. The complete Angular adapter's Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
 
 The intended boundary permits a future runtime replacement without changing application-facing request semantics. Engine lifecycle and integration work still belong to the replacement adapter.
 
 ## Scope
 
-The prototype covers buffered responses for GET and HEAD application-page requests, request-local context, asynchronous native data access, redirects, missing routes, failures, and cancellation.
+The target scope covers buffered responses for GET and HEAD application-page requests, request-local context, asynchronous native data access, redirects, missing routes, failures, and cancellation. The implemented URL boundary below covers only part of this scope.
 
 API request bodies and other methods are handled by explicitly configured host endpoints or rejected by the host's method policy. Streaming responses, WebSockets, binary state transfer, and arbitrary cross-boundary native objects are later work.
 
@@ -48,6 +48,16 @@ The adapter must preserve Angular's hydration requirements. Standard Angular Tra
 AngularAppEngine is a candidate public integration point because its handle method accepts a Request and optional context and returns a Response or null. Compatibility with the embedded environment still requires validation.
 
 ## Contracts and Data
+
+### Implemented URL Boundary
+
+`Renderer::render(url: String)` accepts an owned URL. Each `RenderJob` carries that URL and its own reply channel to the persistent worker. `JavaScriptRuntime::call_string_export` passes the argument as a V8 string value through `call_with_args`; it does not interpolate the URL into JavaScript source. The module's `render(url)` export returns a string that the host delivers through Axum's `Html` response.
+
+GET handlers for `/` and `/{*path}` obtain `OriginalUri` and append its original path and query to the fixed application origin `http://127.0.0.1:3000`. The host does not decode or reconstruct query parameters. Source review confirms that request `Host` and forwarded headers are not used to construct this origin; header-spoofing behavior has not been separately exercised. Configurable origins, trusted proxies, and URL size and validation policies remain open.
+
+The demonstration module escapes `&`, `<`, `>`, double quotes, and apostrophes when displaying the URL as HTML text. Every matched GET path currently produces demonstration HTML; this does not implement Angular route matching, application 404 outcomes, or precedence for API and browser-asset paths.
+
+The job currently contains only the URL field of the request model. Method, repeated headers, request identifier, context, native services, and lifecycle controls remain to be added. A string result also does not implement the complete terminal-outcome and response-metadata models below.
 
 ### Request Model
 
@@ -111,7 +121,7 @@ The following mapping is proposed for the initial host and remains subject to re
 
 Automatic render retries are outside the initial policy. Any future retry must account for deadlines, side effects, and duplicate operations.
 
-Queue capacity, deadlines, input/context size, and maximum buffered response size remain TBD. These values must be selected and recorded before benchmark execution. Exceeding a limit must produce an explicit outcome rather than a partial successful page.
+The current worker has a provisional hardcoded queue capacity of 16 waiting jobs. Configurable capacity, deadlines, input/context size, and maximum buffered response size remain TBD. These values must be selected and recorded before benchmark execution. Exceeding a limit must produce an explicit outcome rather than a partial successful page.
 
 ## Performance Expectations
 
@@ -125,19 +135,25 @@ The benchmark must account for conversion and data-copy costs. Streaming would r
 
 | Requirement | Verification method | Planned evidence | State |
 | --- | --- | --- | --- |
-| RC-01 | Exercise query parameters, direct route access, methods, and repeated headers. | Request conversion checks. | Planned |
+| RC-01 | Exercise query parameters, direct route access, methods, and repeated headers. | Request conversion checks. | Partial: URL path/query transfer verified; method, headers, and request identifier planned. |
 | RC-02 | Alternate contexts and complete an operation after cancellation. | Request-scope checks. | Planned |
 | RC-03 | Exercise each terminal outcome and attempted late completion. | Outcome checks. | Planned |
-| RC-04, RC-05 | Check status, redirects, Set-Cookie, body content, and HEAD delivery. | HTTP delivery checks. | Planned |
-| RC-06, RC-07 | Expire or cancel work, then render a new request on recovered capacity. | Cleanup and recovery checks. | Planned |
+| RC-04, RC-05 | Check status, redirects, Set-Cookie, body content, and HEAD delivery. | HTTP delivery checks. | Partial: successful 200 HTML delivery verified; full response metadata and HEAD comparison planned. |
+| RC-06, RC-07 | Expire or cancel work, then render a new request on recovered capacity. | Cleanup and recovery checks. | Partial: continued execution after ordinary JavaScript and conversion errors verified; cancellation, cleanup, and replacement planned. |
 | RC-08 | Hydrate a page and perform a representative interaction. | Browser check. | Planned |
 | RC-09 | Compare public error responses with internal diagnostics. | Failure reporting review. | Planned |
+
+### URL Transfer Evidence
+
+On 2026-10-10, the repository formatting check, locked offline compilation check for all targets, and full test command passed. The worker integration target alternates two URLs across successful calls 1, 3, and 5, with a JavaScript exception on call 2 and a string-conversion failure on call 4. It checks the exact echoed URL, including query separators and literal apostrophes, after each ordinary failure. This verifies argument association and continued execution; it does not verify isolation of user contexts or recovery from fatal engine failures.
+
+Two HTTP requests to `/products?sort=asc&page=2` and `/search?q=rust&lang=ro` returned 200 HTML responses containing the corresponding absolute URL with `&amp;` in the HTML source. Consecutive counters were 3 and 4. Commands and observations are recorded in the [architecture URL verification](architecture.md#request-url-http-verification). These checks do not establish Angular compatibility, asynchronous renderer behavior, or performance gains.
 
 ## Open Questions
 
 | Question | Impact | Next action |
 | --- | --- | --- |
-| What exact module export and Rust/TypeScript types implement this boundary? | Defines application integration. | Resolve through the first renderer spike. |
+| What complete module export and Rust/TypeScript types implement the Angular boundary? | Defines application integration beyond the current string argument. | Extend the URL prototype through the Angular renderer spike. |
 | Which context fields and encodings are supported? | Defines data compatibility and size limits. | Specify the example service and transfer needs. |
 | How are asynchronous native operations cancelled? | Defines cleanup guarantees. | Prototype success, failure, and late completion. |
 | What is the effective URL and trusted-proxy policy? | Affects routing and request validation. | Select a deployment configuration. |

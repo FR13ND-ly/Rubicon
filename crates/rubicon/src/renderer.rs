@@ -7,6 +7,7 @@ use crate::JavaScriptRuntime;
 const QUEUE_CAPACITY: usize = 16;
 
 struct RenderJob {
+    url: String,
     reply: oneshot::Sender<Result<String, String>>,
 }
 
@@ -41,11 +42,11 @@ impl Renderer {
         Ok(Self { sender })
     }
 
-    pub async fn render(&self) -> Result<String, RenderError> {
+    pub async fn render(&self, url: String) -> Result<String, RenderError> {
         let (reply, response) = oneshot::channel();
 
         self.sender
-            .try_send(RenderJob { reply })
+            .try_send(RenderJob { url, reply })
             .map_err(|error| match error {
                 mpsc::error::TrySendError::Full(_) => RenderError::Busy,
                 mpsc::error::TrySendError::Closed(_) => RenderError::Unavailable,
@@ -100,7 +101,9 @@ fn run_worker(
                 continue;
             }
 
-            let result = runtime.call_string_export(module_id, "render").await;
+            let result = runtime
+                .call_string_export(module_id, "render", &job.url)
+                .await;
 
             let _ = job.reply.send(result);
         }
@@ -121,15 +124,19 @@ mod tests {
         let mut pending_replies = Vec::new();
 
         for _ in 0..QUEUE_CAPACITY {
+            let url = "http://127.0.0.1:3000/test".to_owned();
             let (reply, response) = oneshot::channel();
 
-            assert!(renderer.sender.try_send(RenderJob { reply }).is_ok());
+            assert!(renderer.sender.try_send(RenderJob { url, reply }).is_ok());
             pending_replies.push(response);
         }
 
-        let result = tokio::time::timeout(Duration::from_secs(2), renderer.render())
-            .await
-            .expect("A full queue must reject the request without waiting for capacity");
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            renderer.render("http://127.0.0.1:3000/test".to_owned()),
+        )
+        .await
+        .expect("A full queue must reject the request without waiting for capacity");
 
         assert!(matches!(result, Err(RenderError::Busy)));
         assert_eq!(receiver.len(), QUEUE_CAPACITY);

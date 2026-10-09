@@ -13,12 +13,18 @@ async fn main() -> Result<(), String> {
         .await
         .expect("Worker initialization exceeded the test time limit")?;
 
+    let first_url = "http://127.0.0.1:3000/products?sort=asc&page=2";
+
+    let second_url = "http://127.0.0.1:3000/search?q='quoted'&page=1";
+
     assert_eq!(
-        render(&renderer).await.expect("First render failed"),
-        "<p>Render 1</p>"
+        render(&renderer, first_url)
+            .await
+            .expect("First render failed"),
+        format!("<p>Render 1</p><p>URL: {first_url}</p>"),
     );
 
-    match render(&renderer).await {
+    match render(&renderer, second_url).await {
         Err(RenderError::Failed(message)) => {
             assert!(message.starts_with("Export execution failed:"));
             assert!(message.contains("intentional renderer test error"));
@@ -29,13 +35,13 @@ async fn main() -> Result<(), String> {
     }
 
     assert_eq!(
-        render(&renderer)
+        render(&renderer, second_url)
             .await
             .expect("Render after exception failed"),
-        "<p>Render 3</p>",
+        format!("<p>Render 3</p><p>URL: {second_url}</p>"),
     );
 
-    match render(&renderer).await {
+    match render(&renderer, first_url).await {
         Err(RenderError::Failed(message)) => {
             assert!(message.starts_with("String conversion failed:"));
         }
@@ -45,20 +51,20 @@ async fn main() -> Result<(), String> {
     }
 
     assert_eq!(
-        render(&renderer)
+        render(&renderer, first_url)
             .await
             .expect("Render after conversion error failed"),
-        "<p>Render 5</p>",
+        format!("<p>Render 5</p><p>URL: {first_url}</p>"),
     );
 
     drop(renderer);
 
-    println!("Renderer error checks passed.");
+    println!("Renderer URL and error checks passed.");
     Ok(())
 }
 
-async fn render(renderer: &Renderer) -> Result<String, RenderError> {
-    tokio::time::timeout(Duration::from_secs(5), renderer.render())
+async fn render(renderer: &Renderer, url: &str) -> Result<String, RenderError> {
+    tokio::time::timeout(Duration::from_secs(5), renderer.render(url.to_owned()))
         .await
         .expect("Rendering exceeded the test time limit")
 }
