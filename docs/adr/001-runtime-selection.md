@@ -127,7 +127,20 @@ cargo run --locked --offline --manifest-path crates/rubicon/Cargo.toml
 
 The executable build emitted linker warning LNK4098 about `libcmt.lib` conflicting with other libraries. Execution still completed successfully; the warning remains unresolved and should be investigated before treating this build configuration as a benchmark reference.
 
-This prototype creates and drops a runtime for every function call. It establishes synchronous engine embedding and numeric result conversion only. Persistent runtime reuse, ES modules, asynchronous work, Angular SSR, hydration, request isolation, and performance remain unverified. This evidence does not change the ADR's Draft status.
+That initial revision created and dropped a runtime for every function call. It established synchronous engine embedding and numeric result conversion only. Persistent runtime reuse, ES modules, asynchronous work, Angular SSR, hydration, request isolation, and performance were unverified at that milestone. This evidence did not change the ADR's Draft status.
+
+### Reusing a Runtime Instance
+
+On 2026-10-09, the author replaced the free evaluation function with a `JavaScriptRuntime` type that owns a private `JsRuntime`. Its constructor initializes the engine once; `execute_i64(&mut self, source)` evaluates subsequent synchronous scripts using that existing instance and converts each result to a Rust `i64`.
+
+The executable initializes `globalThis.counter` to zero, then increments it in two separate evaluations. The formatting, locked offline compilation, and locked offline execution checks listed above completed successfully again. Execution produced:
+
+```text
+First execution: 1
+Second execution: 2
+```
+
+This verifies sequential reuse and persistence of JavaScript global state within one runtime. It also demonstrates why request data must later be scoped explicitly: a reused execution context retains globals between calls. Separate-instance isolation, recovery after JavaScript exceptions or conversion failures, worker scheduling, ES modules, asynchronous work, Angular SSR, and performance remain unverified. Linker warning LNK4098 persists. The ADR remains Draft.
 
 ## Decision History
 
@@ -135,3 +148,4 @@ This prototype creates and drops a runtime for every function call. It establish
 | --- | --- | --- |
 | 2026-10-09 | Draft created and expanded. | Record deno_core as a prototype candidate, alternatives, and validation conditions. |
 | 2026-10-09 | Record first synchronous execution and selected deno_core version. | Preserve the verified result, exact checks, unresolved linker warning, and remaining compatibility work. |
+| 2026-10-09 | Record reuse of one runtime instance. | Verify sequential execution and retained global state while keeping request isolation and performance claims separate. |
