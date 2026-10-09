@@ -1,3 +1,7 @@
+let renderCount = 0;
+
 export function render() {
-    return "<h1>Rubicon</h1>";
+    renderCount += 1;
+
+    return `<h1>Rubicon</h1><p>Render ${renderCount}</p>`;
 }

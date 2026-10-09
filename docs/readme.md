@@ -10,11 +10,11 @@ This documentation supports the design, implementation, and evaluation of Rubico
 
 ## Templates
 
-See the [template catalog](templates/readme.md) for specification, architecture decision, and experiment templates.
+See the [template catalog](templates/readme.md) for specification and architecture decision templates.
 
 ## Project Documents
 
-The following documents contain initial drafts for author review. Specifications describe proposed behavior; the architecture records the verified initial HTTP host, and the runtime ADR records verified capabilities including local ES module loading and repeated calls returning HTML. Connecting HTTP to the renderer, Angular SSR integration, and performance evaluation remain future work:
+The following documents contain initial drafts for author review. Specifications describe proposed behavior; the architecture records the verified HTTP-to-JavaScript worker prototype, and the runtime ADR records verified capabilities including local ES module loading and repeated calls returning HTML. Request isolation, Angular SSR integration, and performance evaluation remain future work:
 
 1. [Project overview](specs/project-overview.md)
 2. [Architecture](specs/architecture.md)

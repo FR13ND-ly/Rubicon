@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Initial runtime and HTTP prototypes; Angular SSR not implemented
+**Implementation:** HTTP-to-JavaScript worker prototype; Angular SSR not implemented
 
 ## Purpose and Context
 
@@ -15,7 +15,7 @@ The primary research question is: **Under which workloads and resource constrain
 
 The intended user is a developer building an Angular application who wants to run its server-side rendering and backend services under a Rust host. A small example application will demonstrate consumption of Rubicon and provide a controlled benchmark fixture.
 
-This document describes the proposed framework. Initial prototypes have verified synchronous JavaScript execution, runtime reuse, local ES module loading, and a separate Axum HTTP route returning fixed HTML. Connecting the HTTP route to the renderer, Angular SSR compatibility, and performance results remain future work. The [architecture](architecture.md) and [runtime ADR](../adr/001-runtime-selection.md) record the completed checks and their limits.
+This document describes the proposed framework. Initial prototypes have verified synchronous JavaScript execution, runtime reuse, local ES module loading, and an Axum HTTP route invoking a persistent JavaScript worker. Successive HTTP requests returned HTML with increasing module counter values. The worker uses a fixed queue of 16 waiting jobs and executes one render at a time; the counter is a diagnostic fixture, not request-local user data. Request isolation, Angular SSR compatibility, and performance results remain future work. The [architecture](architecture.md) and [runtime ADR](../adr/001-runtime-selection.md) record the completed checks and their limits.
 
 ## Scope
 

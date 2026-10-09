@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Initial runtime and HTTP prototypes; Angular SSR not implemented
+**Implementation:** HTTP-to-JavaScript worker prototype; Angular SSR not implemented
 
 ## Purpose and Context
 
@@ -31,6 +31,25 @@ The Angular compiler and existing build tools remain responsible for compiling t
 | ARCH-08 | Shutdown and failed-render recovery must have bounded, observable behavior. | Cancellation, failure, and shutdown checks. |
 
 ## Design and Request Flow
+
+### Implemented Worker Prototype
+
+The current executable initializes the V8 platform on the main thread and starts one rendering worker through the library's public `Renderer`. The worker creates a current-thread Tokio executor and a `JavaScriptRuntime` on its dedicated thread, then loads and evaluates `js/render.mjs` once. Runtime operations remain on that thread.
+
+Startup waits for a one-shot module-initialization result before binding the HTTP listener. This confirms runtime creation and module evaluation; the `render` export is checked when invoked, so this handshake does not establish full application rendering readiness.
+
+Axum stores a cloneable `Renderer` in application state. A `GET /` handler submits a job through a bounded Tokio `mpsc` channel and waits for that job's `oneshot` reply. The worker calls the module's zero-argument `render` export, converts the result to a Rust string, and returns it to the handler as buffered HTML.
+
+The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one job at a time. Submission uses `try_send`, so a full queue is rejected immediately rather than creating additional tasks waiting to enqueue. This bounds queued render jobs, not all HTTP connections or total process memory. The value is provisional and has not been tuned by benchmarks.
+
+| Current outcome | HTTP behavior |
+| --- | --- |
+| String returned by `render` | 200 with HTML content type and the returned body. |
+| Queue full | 503 with a generic busy response. |
+| Worker channel or reply channel closed | 503 with a generic unavailable response. |
+| Export execution or result conversion fails | 500 with a generic failure response; details are logged server-side. |
+
+The demonstration module maintains a render counter to show engine and module persistence. The job does not yet carry request information, and retaining this diagnostic counter does not verify isolation of user data. The following Angular request flow remains a proposal.
 
 ### Proposed Components
 
@@ -112,7 +131,7 @@ A persistent Angular engine or cached bootstrap function must not retain a previ
 
 ### Scheduling and Shutdown
 
-The first prototype permits one active render per worker. This conservative policy must be evaluated on both CPU-heavy and asynchronous workloads. Pool size, queue capacity, and render deadline are configurable, with initial values TBD.
+The current prototype permits one active render on its single worker and has a fixed queue capacity of 16 waiting jobs. This conservative policy must be evaluated on both CPU-heavy and asynchronous workloads. The proposed host should make pool size, queue capacity, and render deadlines configurable; the configuration interface and evaluated defaults remain TBD.
 
 Shutdown stops admission, allows active requests to finish within a grace period, cancels remaining work, and releases worker and service resources. The implementation must identify which steps can be interrupted and how an unusable runtime is replaced.
 
@@ -148,7 +167,7 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 
 ### Initial HTTP Host Verification
 
-On 2026-10-10, the author added Axum 0.8.9 and enabled Tokio's multi-thread runtime and network features. The executable binds to `127.0.0.1:3000`, routes `GET /` to a handler returning `Html`, and serves requests through `axum::serve`. The response body is the fixed Rust string `<h1>Rubicon</h1>`; the HTTP handler does not yet invoke the JavaScript renderer.
+On 2026-10-10, the author added Axum 0.8.9 and enabled Tokio's multi-thread runtime and network features. At this milestone, the executable bound to `127.0.0.1:3000`, routed `GET /` to a handler returning `Html`, and served requests through `axum::serve`. The response body was the fixed Rust string `<h1>Rubicon</h1>`; this initial handler did not invoke the JavaScript renderer.
 
 The following checks completed successfully:
 
@@ -162,7 +181,25 @@ curl.exe --max-time 5 -sS -i http://127.0.0.1:3000/
 
 The HTTP check used the author's already-running server and observed `200 OK`, `Content-Type: text/html; charset=utf-8`, and the exact body `<h1>Rubicon</h1>`. The existing runtime regression test passed, with one test passed and zero failed. Linker warning LNK4098 persists in the library test executable; no linker warning was emitted by the application build during this validation.
 
-These checks verify the initial HTTP scaffold, not acceptance of the complete architecture requirements. ARCH-07 still requires connection to the renderer and verification of its response semantics. Worker scheduling, readiness, request isolation, graceful shutdown, Angular SSR, and performance remain unverified.
+These checks established the initial HTTP scaffold. The next milestone below connected it to the JavaScript worker; the complete architecture requirements remain open.
+
+### Persistent Worker HTTP Verification
+
+Later on 2026-10-10, the author added `src/renderer.rs`, enabled Tokio's `sync` feature, and connected the Axum handler to the worker described above. Review confirmed that runtime creation, module loading, and export calls occur on the same dedicated thread, with module loading outside the job loop.
+
+The four Cargo commands listed in the preceding milestone were rerun successfully against this implementation: formatting check, locked offline compilation check, library tests, and executable build. The existing synchronous runtime regression test passed, with one test passed and zero failed. It does not exercise worker queue behavior. Linker warning LNK4098 was emitted for both the library test executable and the application build.
+
+Two successive requests were sent to the author's already-running local server:
+
+```text
+curl.exe --max-time 5 -sS -i http://127.0.0.1:3000/ http://127.0.0.1:3000/
+```
+
+Both returned `200 OK` and `Content-Type: text/html; charset=utf-8`. The bodies were `<h1>Rubicon</h1><p>Render 3</p>` and `<h1>Rubicon</h1><p>Render 4</p>`. The increasing counter confirms that HTTP requests invoke the persistent module instead of returning a fixed Rust string. These were correctness checks, not performance measurements.
+
+Queue overload, worker-channel closure, startup failure, and HTTP error paths have not been exercised by these repository HTTP checks. The prototype's readiness handshake is limited to module initialization. The worker thread handle is detached; there is no implemented join or graceful shutdown policy, render deadline, runtime replacement, or interruption of active JavaScript. A queued job whose reply receiver has closed is skipped, but this does not cancel an active render.
+
+Full acceptance of ARCH-02, ARCH-04, ARCH-05, ARCH-07, and ARCH-08 still requires configuration, failure, isolation, complete response-contract, and lifecycle verification. Angular SSR and benchmark results remain unimplemented.
 
 ## Open Questions
 
@@ -183,5 +220,6 @@ These checks verify the initial HTTP scaffold, not acceptance of the complete ar
 - [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-09; selected Angular version TBD.
 - [deno_core JsRuntime](https://docs.rs/deno_core/latest/deno_core/struct.JsRuntime.html), documentation observed at 0.412.0 on 2026-10-09; prototype dependency pinned to 0.412.0.
 - [Axum serve API](https://docs.rs/axum/latest/axum/fn.serve.html), rolling documentation observed at 0.8.9 on 2026-10-10; prototype dependency pinned to 0.8.9.
+- [Tokio bounded channel submission](https://docs.rs/tokio/latest/tokio/sync/mpsc/struct.Sender.html#method.try_send), documentation observed at 1.53.2 on 2026-10-10; prototype dependency pinned to 1.53.2.
 - [Angular library creation](https://angular.dev/tools/libraries/creating-libraries), rolling documentation checked on 2026-10-09.
 - [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html), rolling documentation checked on 2026-10-09.
