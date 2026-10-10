@@ -1,6 +1,7 @@
 # ADR 001: JavaScript Runtime Selection
 
 **Date:** 2026-10-09
+**Last updated:** 2026-10-10
 **Status:** Draft
 **Decision scope:** Prototype
 
@@ -76,7 +77,7 @@ No latency, throughput, startup, or memory improvement has been measured.
 ### Follow-up
 
 1. Pin Angular, Rust, deno_core, and relevant extension versions.
-2. Execute a small module and verify its asynchronous behavior in the embedded runtime.
+2. Execute a small module and verify its asynchronous behavior in the embedded runtime. Local import, Promise fulfillment, rejection after an awaited microtask, and continued execution are verified below; asynchronous native-service integration remains a separate condition.
 3. Load a minimal Angular server artifact and obtain correct HTML.
 4. Serve that HTML with its matching browser assets and verify hydration.
 5. Demonstrate asynchronous native data access and request isolation.
@@ -183,6 +184,14 @@ Second render: <h1>Rubicon</h1>
 
 This verifies local module loading, evaluation, exported-function access, repeated invocation, and HTML string transfer to Rust. The Rust orchestration is asynchronous, but the tested JavaScript renderer is synchronous. Promise-returning renderers, import graphs, module failure recovery, HTTP serving, worker scheduling, Angular SSR, hydration, request isolation, and performance remain unverified. Linker warning LNK4098 persists in both the test executable and application executable. The ADR remains Draft.
 
+### Asynchronous Renderer Verification
+
+On 2026-10-10, the author added an async fixture that imports the existing synchronous renderer and awaits `Promise.resolve()` before delegating to it. The worker integration executable now runs the same response and failure checks for both entrypoints, each in a fresh worker initialized after the process-wide V8 platform setup. No engine or runtime implementation change was needed.
+
+Repository formatting, locked offline compilation for all targets, and the complete test suite passed. Six library and four executable unit tests succeeded. The integration executable printed `Renderer fixture passed: renderer_errors.mjs` and `Renderer fixture passed: renderer_async.mjs`. Both paths retain exact structured response metadata and request fields; the async path converts successful Promise values, reports the intentional rejection, rejects an invalid body shape after fulfillment, and returns valid later results. Linker warning LNK4098 persists. The [architecture evidence](../specs/architecture.md#asynchronous-renderer-verification) records the full commands and cases.
+
+This verifies a small local import graph and Promise/microtask behavior for the pinned deno_core candidate. It does not verify the Angular artifact environment, timers or native I/O, cancellation, cleanup, isolation, or performance. The ADR remains Draft, with acceptance conditions unchanged.
+
 ## Decision History
 
 | Date | Change | Reason |
@@ -192,3 +201,4 @@ This verifies local module loading, evaluation, exported-function access, repeat
 | 2026-10-09 | Record reuse of one runtime instance. | Verify sequential execution and retained global state while keeping request isolation and performance claims separate. |
 | 2026-10-09 | Record continued execution after synchronous errors. | Verify execution and conversion error propagation and valid subsequent execution on the same runtime. |
 | 2026-10-09 | Record local ES module loading and HTML return values. | Verify loading once and calling the synchronous exported renderer twice through asynchronous Rust orchestration. |
+| 2026-10-10 | Record Promise-returning renderer checks. | Verify a local import, fulfillment, rejection after an awaited microtask, typed response conversion, and continued execution while keeping native I/O and Angular acceptance pending. |

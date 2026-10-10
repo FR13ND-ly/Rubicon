@@ -165,7 +165,7 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 | ARCH-05 | Alternate identities and verify cleanup after successful and failed renders. | Isolation checks and sustained-operation run. | Planned |
 | ARCH-06 | Exercise service success, failure, and late completion. | Native-service integration checks. | Planned |
 | ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: structured worker results, response conversion, and temporary router delivery checks passed; live network verification of the structured path and complete Angular outcomes remain planned. |
-| ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Partial: continued execution after ordinary renderer errors verified; cancellation and shutdown planned. |
+| ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Partial: continued execution after ordinary synchronous errors, Promise rejection, and response-conversion errors verified; cancellation and shutdown planned. |
 
 ### Initial HTTP Host Verification
 
@@ -428,6 +428,24 @@ Six library tests, four executable unit tests, and the standalone integration ta
 A prior proposal check in a temporary copy also exercised the actual handler through an Axum Router. It verified 200 and 404 body bytes, two separate cookies, HTML content type, UTF-8 representation length, empty HEAD delivery, redirect Location for GET and HEAD, and generic HTTP 500 for invalid status, forbidden Content-Length, a nonempty 204 body, malformed result shape, and an execution exception. A final valid request succeeded after those failures. That router test, its controlled fixture, and a direct Tower dependency remained confined to the temporary copy. A second temporary check of the author's files passed the existing suite after the pending signature correction; the final repository checks above verify the author's completed source.
 
 These are correctness checks. Network delivery was not repeated for this milestone, and the additional router checks are not retained regression coverage. An explicit unmatched Angular outcome, asynchronous renderer proof, native services, request isolation, deadlines, worker lifecycle, Angular SSR and hydration, and performance measurement remain future work. The [rendering contract](rendering-contract.md#structured-response-transport-evidence) records the implemented boundary and its verification limits.
+
+### Asynchronous Renderer Verification
+
+Later on 2026-10-10, the author added `tests/fixtures/renderer_async.mjs`. This local ES module imports the existing synchronous fixture as `renderSync`; its `async render(request)` awaits `Promise.resolve()` before delegating to that function. The return value is a Promise, and the fixture's intentional throw after the await becomes a rejection. An invalid body object is returned through a fulfilled Promise and must still fail conversion to `RenderResponse`.
+
+The standalone integration executable now initializes V8 once, then calls `check_renderer_fixture` for the synchronous module and the async wrapper. Each check starts a fresh worker and runs the same five requests. This preserves synchronous regression coverage and independent counter expectations while adding Promise-result coverage. No runtime, scheduler, HTTP code, or dependency changed; the existing `call_with_args` and `with_event_loop_promise` path already supports this behavior.
+
+The following repository checks passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+Six library tests and four executable unit tests passed. The standalone integration target printed both `Renderer fixture passed: renderer_errors.mjs` and `Renderer fixture passed: renderer_async.mjs`. For both workers, calls 1, 3, and 5 preserve statuses 302, 404, and 200, repeated cookies, redirect Location, and exact Unicode body content containing the original request fields. Call 2 reports an export execution failure, and call 4 reports a result-conversion failure; later requests succeed. Linker warning LNK4098 persists. A prior check of the same proposal in a temporary copy also passed.
+
+This verifies one relative ES-module import, Promise fulfillment, a rejection after an awaited microtask, typed conversion after fulfillment, and continued ordinary worker execution. It does not verify timers, network I/O, asynchronous Rust operations, permanently pending Promises, cancellation, interruption, rollback of side effects, or full request isolation. The live demonstration remains synchronous, and HTTP behavior was not rechecked for this test-only step. Angular compatibility, hydration, and performance remain unverified. See the [rendering-contract evidence](rendering-contract.md#asynchronous-renderer-evidence) and [runtime decision evidence](../adr/001-runtime-selection.md#asynchronous-renderer-verification).
 
 ## Open Questions
 

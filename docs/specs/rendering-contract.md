@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Structured request and response transport connected to the HTTP handler; Angular adapter not implemented
+**Implementation:** Structured transport connected to HTTP; synchronous and Promise-returning exports checked; Angular adapter not implemented
 
 ## Purpose and Context
 
@@ -167,7 +167,7 @@ The benchmark must account for conversion and data-copy costs. Streaming would r
 | RC-03 | Exercise each terminal outcome and attempted late completion. | Outcome checks. | Planned |
 | RC-04 | Check status, redirects, Set-Cookie, and body content. | Response-object and HTTP delivery checks. | Partial: structured worker metadata and body preservation verified; temporary router delivery checks passed; network and Angular integration remain planned. |
 | RC-05 | Compare GET representation metadata with HEAD delivery. | HTTP delivery checks. | Partial: earlier demonstration network evidence and temporary structured-response router checks verify body omission and representation length; Angular metadata and broader transport coverage remain planned. |
-| RC-06, RC-07 | Expire or cancel work, then render a new request on recovered capacity. | Cleanup and recovery checks. | Partial: continued execution after ordinary JavaScript and conversion errors verified; cancellation, cleanup, and replacement planned. |
+| RC-06, RC-07 | Expire or cancel work, then render a new request on recovered capacity. | Cleanup and recovery checks. | Partial: continued execution after ordinary synchronous errors, Promise rejection, and conversion errors verified; cancellation, cleanup, and replacement planned. |
 | RC-08 | Hydrate a page and perform a representative interaction. | Browser check. | Planned |
 | RC-09 | Compare public error responses with internal diagnostics. | Failure reporting review. | Planned |
 
@@ -212,6 +212,12 @@ These checks support process-local identity and lossless string transfer. They d
 On 2026-10-10, formatting, locked offline compilation for all targets, and the complete repository test suite passed with the connected response path. Six library tests, four executable unit tests, and the standalone worker integration target succeeded. Integration comparisons verify status, exact header pairs, and Unicode body content for successful calls 1, 3, and 5; ordinary execution and body-conversion failures on calls 2 and 4 do not prevent later results. An intentional application 404 remains a successful `RenderResponse`.
 
 A temporary proposal check exercised the handler through an Axum Router, verifying redirects, repeated cookies, UTF-8 body length, empty HEAD bodies, and generic 500 mapping for execution errors, malformed results, and invalid HTTP metadata. Those tests and their Tower dependency are not retained in the repository, and new network checks were not run for this milestone. The [architecture milestone](architecture.md#structured-response-transport-verification) records exact cases and limits. Angular outcomes, async rendering, context isolation, cancellation, cleanup, and performance remain unverified.
+
+### Asynchronous Renderer Evidence
+
+On 2026-10-10, formatting, locked offline compilation for all targets, and the complete repository test suite passed after adding the [async fixture](../../crates/rubicon/tests/fixtures/renderer_async.mjs). The integration executable runs the same five response/error checks against the synchronous fixture and its async wrapper, using a fresh worker for each. The wrapper imports the synchronous function, awaits `Promise.resolve()`, and then delegates. Valid responses are deserialized after fulfillment; the intentional throw becomes a rejected Promise, and a fulfilled response with an object body fails typed conversion. Calls after either failure succeed with exact status, response headers, body, and request fields.
+
+Six library tests and four executable unit tests passed, and both fixture success messages were printed. No source change to the runtime or HTTP handler and no dependency update was required. The [architecture milestone](architecture.md#asynchronous-renderer-verification) records exact checks. This establishes Promise and microtask behavior in the controlled fixture, rather than asynchronous native I/O, cancellation, cleanup guarantees, or Angular compatibility. Test wait limits do not establish interruption of JavaScript or recovery from a permanently pending Promise.
 
 ## Open Questions
 

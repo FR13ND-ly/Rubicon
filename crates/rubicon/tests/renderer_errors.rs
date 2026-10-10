@@ -6,8 +6,17 @@ use rubicon::{RenderError, RenderRequest, RenderResponse, Renderer};
 async fn main() -> Result<(), String> {
     deno_core::JsRuntime::init_platform(None);
 
-    let module_path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/renderer_errors.mjs");
+    for fixture_name in ["renderer_errors.mjs", "renderer_async.mjs"] {
+        check_renderer_fixture(fixture_name).await?;
+    }
+
+    Ok(())
+}
+
+async fn check_renderer_fixture(fixture_name: &str) -> Result<(), String> {
+    let module_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(fixture_name);
 
     let renderer = tokio::time::timeout(Duration::from_secs(5), Renderer::start(module_path))
         .await
@@ -63,7 +72,7 @@ async fn main() -> Result<(), String> {
 
     drop(renderer);
 
-    println!("Renderer response and error checks passed.");
+    println!("Renderer fixture passed: {fixture_name}");
     Ok(())
 }
 
