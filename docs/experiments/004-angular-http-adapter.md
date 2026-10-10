@@ -1,12 +1,12 @@
 # Experiment 004: Angular Adapter and Rust HTTP Delivery
 
-**Status:** Completed temporary check; author implementation pending
+**Status:** Completed temporary check; repository implementation verified
 **Created:** 2026-10-11
 **Last updated:** 2026-10-11
 **Type:** Integration correctness check; not a performance benchmark
 **Source revision:** `15f085c`
 **Application:** Angular 22.2.2, development neutral build
-**Implementation scope:** Temporary application and Rust copies; repository source unchanged
+**Implementation scope:** Temporary proposal check followed by author implementation and repository verification
 
 ## Question and Result
 
@@ -14,7 +14,7 @@ Can the neutral TypeScript entry export Rubicon's render contract, and can the e
 
 Yes, for the controlled requests checked below. The temporary application built successfully with a named render export in server.mjs. The existing Rust server selected that module and delivered Home and About SSR, a plain-text 404 for an unhandled route, repeated Home, and Home with a query string. HEAD returned no body and Content-Length matching the GET representation. The browser script referenced by the HTML returned 404 because this step adds no static-file service.
 
-The earlier [worker diagnostic](003-performance-angular-render.md) used a separate JavaScript wrapper around an already-built handler and did not start an HTTP server. This experiment places the adapter in the application's TypeScript source, rebuilds it, and exercises real HTTP delivery through Axum. The actual repository executable still selects js/render.mjs until the author applies the edits.
+The earlier [worker diagnostic](003-performance-angular-render.md) used a separate JavaScript wrapper around an already-built handler and did not start an HTTP server. This experiment places the adapter in the application's TypeScript source, rebuilds it, and exercises real HTTP delivery through Axum. The author subsequently applied both source edits; repository verification is recorded below.
 
 ## Proposed TypeScript Entry
 
@@ -171,6 +171,26 @@ Local diagnostic output is retained only in ignored crates/rubicon/target/angula
 Home and About should return 200 and already contain their headings in the HTML source. The fallback should return 404 with Not found. HEAD should return 200 with headers and no body. Stop an older Rubicon process before starting the new executable on the same port.
 
 After actual repository verification and its implementation commit, serve the matching dist/rubicon/browser assets through Rust, then repeat the established [hydration and counter checks](../../examples/angular-demo/README.md#browser-hydration-check).
+
+## Repository Verification
+
+On 2026-10-11, starting from `b021f64`, the author implemented the TypeScript render adapter and changed the Rust executable's module path to the generated neutral server entry. There was no dependency, worker scheduler, HTTP converter, or request/response type change.
+
+The actual repository neutral development build passed and prerendered zero static routes. Repository formatting verification, locked offline all-target compilation, the full Rust test suite, and the normal server build passed. Eight library tests, four executable tests, and all six integration fixtures passed; one macro-generated documentation example was ignored. LNK4098 persisted.
+
+HTTP checks against the repository executable on port 3000 returned:
+
+```text
+REPOSITORY_HTTP_OK GET / 200 1670 bytes
+REPOSITORY_HTTP_OK GET /about 200 1583 bytes
+REPOSITORY_HTTP_OK GET /missing 404 9 bytes
+REPOSITORY_HTTP_OK GET /?sort=asc&page=2 200 1670 bytes
+REPOSITORY_HTTP_OK GET / 200 1670 bytes
+REPOSITORY_HTTP_OK HEAD / 200 0 bytes; Content-Length=1670
+REPOSITORY_BROWSER_ASSET_PENDING /main.js 404
+```
+
+Successful pages contained their expected heading, SSR marker, and hydration annotations, and used text/html content type. All Home responses started with counter zero. The fallback body was exactly Not found, and HEAD's Content-Length matched GET. The verification server process was stopped after checking. Local output is retained in ignored crates/rubicon/target/angular-http-repository.log. Browser files and actual browser hydration through Rust remain the next integration step; repeated zero counters do not establish request isolation.
 
 ## Limits and Remaining Work
 

@@ -19,7 +19,8 @@ static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 async fn main() -> Result<(), String> {
     deno_core::JsRuntime::init_platform(None);
 
-    let module_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("js/render.mjs");
+    let module_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/angular-demo/dist/rubicon/server/server.mjs");
 
     let renderer = Renderer::start(module_path).await?;
 

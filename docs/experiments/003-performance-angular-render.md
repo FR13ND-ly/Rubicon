@@ -1,6 +1,6 @@
 # Experiment 003: Performance API and First Embedded Angular Render
 
-**Status:** Completed temporary check; repository performance API verified; Angular adapter pending
+**Status:** Completed temporary check; repository performance API verified; Angular adapter implemented in experiment 004 follow-up
 **Created:** 2026-10-11
 **Last updated:** 2026-10-11
 **Type:** Exploratory correctness check; not a performance benchmark
@@ -13,7 +13,7 @@ Can the current persistent Rust worker render the pinned Angular application's n
 
 Yes, for the five calls checked below. The current runtime initially failed the first GET with `ReferenceError: performance is not defined` during lazy application-module initialization. A temporary bootstrap addition exposing Deno's real performance object and initializing timeOrigin enabled Home and About SSR, a controlled 404 fallback, repeated Home rendering, and a HEAD representation. Each response also passed Rubicon's existing HTTP response conversion helper.
 
-The Angular 22.2.2 development artifact was built earlier using the normal Angular CLI. The rendering calls here executed in the Rust worker and embedded V8; no HTTP server was started by the diagnostic. The author subsequently implemented the performance bootstrap and fixture, as recorded below. The actual repository executable still loads its demonstration module; the Angular adapter remains pending.
+The Angular 22.2.2 development artifact was built earlier using the normal Angular CLI. The rendering calls here executed in the Rust worker and embedded V8; no HTTP server was started by the diagnostic. The author subsequently implemented the performance bootstrap and fixture, as recorded below. The [experiment 004 follow-up](004-angular-http-adapter.md#repository-verification) records the later repository Angular adapter and HTTP delivery.
 
 This establishes initial embedded rendering correctness. Browser asset serving, hydration through Rubicon, native networking, isolation, lifecycle acceptance, and performance measurement remain pending.
 
@@ -263,7 +263,7 @@ Eight library tests, four executable tests, and all six integration fixtures pas
 
 ## Author's Next Step
 
-The performance bootstrap and sixth fixture are verified in the repository. The next [HTTP adapter proposal](004-angular-http-adapter.md) includes the exact TypeScript entry and Rust path edits, with successful temporary build and HTTP checks. Apply and verify those edits in the repository, then serve the matching browser assets and repeat the established browser hydration and counter checks.
+The performance bootstrap and sixth fixture are verified in the repository. The [HTTP adapter follow-up](004-angular-http-adapter.md#repository-verification) now records the implemented TypeScript entry and Rust path edits and their actual repository verification. Next serve the matching browser assets and repeat the established browser hydration and counter checks.
 
 ## Limits
 

@@ -55,7 +55,7 @@ Configuration order matters: development settings apply first, then the Rubicon 
 
 Direct handler verification in Node.js returned HTML responses with status 200, expected page headings, SSR markers, and hydration annotations for Home and About; Home's counter was zero. An unknown route returned `null`. The generated module also loaded and evaluated through Rubicon's unchanged bare deno_core runtime, using the temporary diagnostic retained in the [compatibility record](../../docs/experiments/001-angular-runtime-compatibility.md#repository-entrypoint-verification). That diagnostic did not invoke an Angular render in deno_core.
 
-The runtime still needs compatible Web APIs and an adapter exporting Rubicon's `render` contract. The existing Rust executable continues to use its demonstration module. Browser asset delivery and hydration through Rust remain pending.
+The selected embedded Web APIs and the adapter exporting Rubicon's render contract are now implemented and verified. The existing Rust executable loads the generated neutral server module and delivers Home/About SSR, query routing, a 404 fallback, and an empty HEAD response with matching Content-Length. The [repository verification](../../docs/experiments/004-angular-http-adapter.md#repository-verification) records the outputs. Browser asset delivery and hydration through Rust remain pending.
 
 ## Host Configuration
 
@@ -97,8 +97,8 @@ The screenshot records the Node.js development build after interaction. Browser 
 
 ## Next Steps
 
-1. The selected embedded Web APIs are implemented and verified. Apply the checked [TypeScript adapter and Rust module selection](../../docs/experiments/004-angular-http-adapter.md), then repeat its HTTP checks in the repository.
-2. Render the same application through Rubicon and serve its matching browser assets.
+1. The selected embedded Web APIs and [TypeScript adapter and Rust module selection](../../docs/experiments/004-angular-http-adapter.md) are implemented and verified through HTTP.
+2. Serve the matching browser assets through Rubicon.
 3. Repeat HTTP, browser hydration, and interaction checks through the Rust host.
 4. Add native data access and lifecycle controls before performance evaluation.
 

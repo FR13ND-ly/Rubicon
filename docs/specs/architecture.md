@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-11
-**Implementation:** HTTP-to-JavaScript worker prototype and Node.js Angular SSR/hydration reference; Angular integration into Rubicon pending
+**Implementation:** Rust HTTP server rendering Angular through a persistent embedded worker; Node.js hydration reference; browser assets and hydration through Rust pending
 
 ## Purpose and Context
 
@@ -34,7 +34,7 @@ The Angular compiler and existing build tools remain responsible for compiling t
 
 ### Implemented Worker Prototype
 
-The current executable initializes the V8 platform on the main thread and starts one rendering worker through the library's public `Renderer`. The worker creates a current-thread Tokio executor and a `JavaScriptRuntime` on its dedicated thread, then loads and evaluates `js/render.mjs` once. Runtime operations remain on that thread.
+The current executable initializes the V8 platform on the main thread and starts one rendering worker through the library's public `Renderer`. The worker creates a current-thread Tokio executor and a `JavaScriptRuntime` on its dedicated thread, then loads and evaluates the generated neutral Angular server/server.mjs entry once. Angular's application modules are imported lazily during rendering. Runtime operations remain on that thread.
 
 Startup waits for a one-shot module-initialization result before binding the HTTP listener. This confirms runtime creation and module evaluation; the `render` export is checked when invoked, so this handshake does not establish full application rendering readiness.
 
@@ -44,14 +44,14 @@ The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one 
 
 | Current outcome | HTTP behavior |
 | --- | --- |
-| Valid response object returned by `render` | Preserves application status, repeated header pairs, and buffered body; HEAD omits the body. The demonstration supplies 200 and HTML content type. |
+| Valid response object returned by `render` | Preserves application status, repeated header pairs, and buffered body; HEAD omits the body. The Angular reference pages supply 200 HTML; the adapter supplies a 404 text response for an unhandled route. |
 | Request identifier counter exhausted | 503 before header conversion or worker submission; counter remains exhausted. |
 | Queue full | 503 with a generic busy response. |
 | Worker channel or reply channel closed | 503 with a generic unavailable response. |
 | Export execution or result conversion fails | 500 with a generic failure response; details are logged server-side. |
 | Response metadata violates host policy | 500 with a generic failure response; conversion details and request identifier are logged server-side. |
 
-The demonstration module displays the request identifier, URL, a page method, and `x-rubicon-demo` header values using HTML text escaping and maintains a render counter to show engine and module persistence. For HEAD, the page method is `GET`, so the generated HTML describes the corresponding GET representation; the actual request method remains `HEAD`. A job currently carries identifier, URL, method, and header pairs from the proposed request model. The identifier is unique within one server execution and resets on restart; library callers supply their own identifier. Rendering-failure logs include the HTTP host's generated identifier. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. Empty HEAD delivery and demonstration Content-Length matching the GET representation are verified. The following Angular request flow remains a proposal.
+The neutral TypeScript adapter constructs a Web Request from the owned URL, method, and header pairs, invokes one module-scoped AngularAppEngine through its handler, and returns status, repeated header pairs, and a buffered body. Its request identifier is accepted but not injected into Angular providers. The identifier is unique within one server execution and resets on restart; library callers supply their own identifier. Rendering-failure logs include the HTTP host's generated identifier. Home/About SSR, query routing, an unhandled-route 404, and empty HEAD delivery with matching Content-Length are verified. Browser files are not yet served. The earlier js/render.mjs diagnostic is retained but no longer selected by the executable. Request isolation and cleanup remain unverified; the broader component and lifecycle design below remains a proposal.
 
 ### Proposed Components
 
@@ -113,7 +113,7 @@ Angular remains responsible for matching application routes during rendering. Th
 | Worker to Angular adapter | Serializable request information and scoped service access | Response, no matching route, or failure | The worker reports the failure and cleans up. |
 | Adapter to native service | Request-scoped operation and arguments | Data or explicit error | Late results cannot affect a different request. |
 
-The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The demonstration currently uses `render(request)` with string identifier, URL, method, and header-pair fields; configuration format, the complete Angular adapter interface, and service-operation names remain TBD.
+The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The implemented Angular adapter uses render(request) with string identifier, URL, method, and header-pair fields and returns buffered status/headers/body. Configuration format, context injection, the complete Angular adapter interface, and service-operation names remain TBD.
 
 The initial response is buffered HTML. The matching browser artifacts must come from the same application build. Any HTML processing must preserve the structure and state required for hydration.
 
@@ -549,11 +549,19 @@ On 2026-10-11, starting from `436efd1`, the author loaded Deno's performance imp
 
 Repository formatting verification, locked offline compilation for all targets, and the full test suite passed. Eight library tests, four executable tests, and all six fixtures passed; one macro-generated documentation example was ignored. LNK4098 persists. The [experiment follow-up](../experiments/003-performance-angular-render.md#repository-performance-verification) records the commands and outcomes. This supplies runtime infrastructure required by Angular; it is not a performance result or evidence of automatic application cleanup.
 
+### Angular HTTP Integration Verification
+
+On 2026-10-11, starting from `b021f64`, the author implemented the render export in the neutral TypeScript entry and selected its generated server.mjs in the Rust executable. The adapter constructs a Web Request, delegates to the existing Angular handler, maps null to a plain-text 404, preserves separate Set-Cookie fields, and buffers the body with response.text. Request identifiers cross the adapter boundary but are not injected into Angular providers.
+
+The actual neutral development build passed with zero prerendered routes. Repository formatting verification, locked offline all-target compilation, the full Rust test suite, and the executable build passed. Eight library tests, four executable tests, and all six integration fixtures passed; one macro-generated documentation example was ignored. LNK4098 persisted.
+
+Actual HTTP requests on port 3000 verified Home/About headings, SSR markers, hydration annotations, text/html responses, an unknown-route 404, query routing, repeated Home with counter zero, and HEAD with no body and Content-Length equal to GET. The main.js request returned 404 because the host still routes browser files to the Angular handler. The [repository follow-up](../experiments/004-angular-http-adapter.md#repository-verification) records the exact outputs. These checks verify selected buffered SSR pages, not browser hydration, lifecycle guarantees, request isolation, or performance.
+
 ## Open Questions
 
-The [performance/Angular experiment](../experiments/003-performance-angular-render.md) verified Angular rendering in a temporary copy of `49709a9`. Angular's first lazy application import required the missing performance global. Initializing Deno's performance object enabled five sequential worker calls: Home, About, a mapped unknown route, repeated Home, and a HEAD representation, all accepted by the existing response converter. Eight library tests, four executable tests, and six fixtures passed in the copy. The performance bootstrap and fixture are now verified in the repository. The Angular adapter, HTTP delivery of Angular, browser assets, hydration, and lifecycle acceptance remain pending.
+The [performance/Angular experiment](../experiments/003-performance-angular-render.md) verified Angular rendering in a temporary copy of `49709a9`. Angular's first lazy application import required the missing performance global. Initializing Deno's performance object enabled five sequential worker calls: Home, About, a mapped unknown route, repeated Home, and a HEAD representation, all accepted by the existing response converter. Eight library tests, four executable tests, and six fixtures passed in the copy. The performance bootstrap, fixture, and subsequent Angular HTTP adapter are now verified in the repository. Browser assets, hydration, and lifecycle acceptance remain pending.
 
-The subsequent [HTTP adapter experiment](../experiments/004-angular-http-adapter.md), based on `15f085c`, rebuilt a TypeScript render export and selected its generated module in a temporary Rust executable. Real HTTP checks verified Home/About SSR, the 404 fallback, query routing, and an empty HEAD response with Content-Length matching GET. Existing Rust tests and all six fixtures passed. The HTML's browser script returned 404. The two source edits are checked proposals awaiting author implementation; static asset service and browser hydration are the next steps after repository verification.
+The subsequent [HTTP adapter experiment](../experiments/004-angular-http-adapter.md), based on `15f085c`, rebuilt a TypeScript render export and selected its generated module in a temporary Rust executable. The author has now implemented both edits and the actual repository HTTP checks passed as recorded above. Static asset service and browser hydration through Rust are the next steps.
 
 | Question | Impact | Next action |
 | --- | --- | --- |
