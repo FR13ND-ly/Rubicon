@@ -2,13 +2,13 @@ use std::{path::PathBuf, thread};
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{JavaScriptRuntime, RenderRequest};
+use crate::{JavaScriptRuntime, RenderRequest, RenderResponse};
 
 const QUEUE_CAPACITY: usize = 16;
 
 struct RenderJob {
     request: RenderRequest,
-    reply: oneshot::Sender<Result<String, String>>,
+    reply: oneshot::Sender<Result<RenderResponse, String>>,
 }
 
 #[derive(Clone)]
@@ -42,7 +42,7 @@ impl Renderer {
         Ok(Self { sender })
     }
 
-    pub async fn render(&self, request: RenderRequest) -> Result<String, RenderError> {
+    pub async fn render(&self, request: RenderRequest) -> Result<RenderResponse, RenderError> {
         let (reply, response) = oneshot::channel();
 
         self.sender
@@ -102,7 +102,7 @@ fn run_worker(
             }
 
             let result = runtime
-                .call_export::<_, String>(module_id, "render", &job.request)
+                .call_export::<_, RenderResponse>(module_id, "render", &job.request)
                 .await;
 
             let _ = job.reply.send(result);

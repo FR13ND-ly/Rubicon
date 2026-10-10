@@ -7,10 +7,10 @@ use axum::{
     Router,
     extract::{OriginalUri, State},
     http::{HeaderMap, Method, StatusCode},
-    response::Html,
+    response::Response,
     routing::get,
 };
-use rubicon::{RenderError, RenderRequest, Renderer};
+use rubicon::{RenderError, RenderRequest, Renderer, into_http_response};
 
 const APPLICATION_ORIGIN: &str = "http://127.0.0.1:3000";
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
@@ -46,7 +46,7 @@ async fn root(
     OriginalUri(uri): OriginalUri,
     method: Method,
     headers: HeaderMap,
-) -> Result<Html<String>, (StatusCode, &'static str)> {
+) -> Result<Response, (StatusCode, &'static str)> {
     let path_and_query = uri
         .path_and_query()
         .map(|value| value.as_str())
@@ -63,7 +63,11 @@ async fn root(
     };
 
     match renderer.render(request).await {
-        Ok(html) => Ok(Html(html)),
+        Ok(rendered) => into_http_response(rendered).map_err(|error| {
+            eprintln!("Response conversion failed [request_id={request_id}]: {error}");
+
+            (StatusCode::INTERNAL_SERVER_ERROR, "Rendering failed.")
+        }),
 
         Err(RenderError::Busy) => Err((StatusCode::SERVICE_UNAVAILABLE, "Server busy. Try again.")),
 

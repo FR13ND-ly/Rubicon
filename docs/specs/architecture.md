@@ -38,17 +38,18 @@ The current executable initializes the V8 platform on the main thread and starts
 
 Startup waits for a one-shot module-initialization result before binding the HTTP listener. This confirms runtime creation and module evaluation; the `render` export is checked when invoked, so this handshake does not establish full application rendering readiness.
 
-Axum stores a cloneable `Renderer` in application state. Handlers registered through `get` for `/` and `/{*path}` also receive HEAD requests. They extract `OriginalUri`, `Method`, and `HeaderMap`, combine the original path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest` containing a string identifier, URL, method, and header pairs. A process-local atomic counter generates the identifier before header conversion; checked increment rejects exhaustion without wrapping. Client headers do not select this identifier. The host visits each name and all its values to preserve repeated fields, rejecting unsupported text values with HTTP 400 before dispatch. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request`, converts it directly into a V8 object through `serde_v8::to_v8`, and invokes the module's `render(request)` export. The result becomes a Rust string returned as buffered HTML; Axum omits the HEAD body.
+Axum stores a cloneable `Renderer` in application state. Handlers registered through `get` for `/` and `/{*path}` also receive HEAD requests. They extract `OriginalUri`, `Method`, and `HeaderMap`, combine the original path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest` containing a string identifier, URL, method, and header pairs. A process-local atomic counter generates the identifier before header conversion; checked increment rejects exhaustion without wrapping. Client headers do not select this identifier. The host visits each name and all its values to preserve repeated fields, rejecting unsupported text values with HTTP 400 before dispatch. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request`, converts it directly into a V8 object through `serde_v8::to_v8`, and invokes the module's `render(request)` export. The result is deserialized into an owned `RenderResponse`, transported through the reply channel, and validated by `into_http_response` in the handler. Axum applies transport framing and omits the HEAD body.
 
 The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one job at a time. Submission uses `try_send`, so a full queue is rejected immediately rather than creating additional tasks waiting to enqueue. This bounds queued render jobs, not all HTTP connections or total process memory. The value is provisional and has not been tuned by benchmarks.
 
 | Current outcome | HTTP behavior |
 | --- | --- |
-| String returned by `render` | 200 with HTML content type; GET delivers the returned body and HEAD omits it. |
+| Valid response object returned by `render` | Preserves application status, repeated header pairs, and buffered body; HEAD omits the body. The demonstration supplies 200 and HTML content type. |
 | Request identifier counter exhausted | 503 before header conversion or worker submission; counter remains exhausted. |
 | Queue full | 503 with a generic busy response. |
 | Worker channel or reply channel closed | 503 with a generic unavailable response. |
 | Export execution or result conversion fails | 500 with a generic failure response; details are logged server-side. |
+| Response metadata violates host policy | 500 with a generic failure response; conversion details and request identifier are logged server-side. |
 
 The demonstration module displays the request identifier, URL, a page method, and `x-rubicon-demo` header values using HTML text escaping and maintains a render counter to show engine and module persistence. For HEAD, the page method is `GET`, so the generated HTML describes the corresponding GET representation; the actual request method remains `HEAD`. A job currently carries identifier, URL, method, and header pairs from the proposed request model. The identifier is unique within one server execution and resets on restart; library callers supply their own identifier. Rendering-failure logs include the HTTP host's generated identifier. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. Empty HEAD delivery and demonstration Content-Length matching the GET representation are verified. The following Angular request flow remains a proposal.
 
@@ -163,7 +164,7 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 | ARCH-04 | Offer work above capacity and inspect admission and queue counts. | Scheduler checks and overload run. | Partial: controlled queue rejection verified; configured scheduling and HTTP overload planned. |
 | ARCH-05 | Alternate identities and verify cleanup after successful and failed renders. | Isolation checks and sustained-operation run. | Planned |
 | ARCH-06 | Exercise service success, failure, and late completion. | Native-service integration checks. | Planned |
-| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: URL/method and repeated-header propagation, successful HTML delivery, HEAD body omission, and demonstration HEAD representation length verified; complete response contract planned. |
+| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: structured worker results, response conversion, and temporary router delivery checks passed; live network verification of the structured path and complete Angular outcomes remain planned. |
 | ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Partial: continued execution after ordinary renderer errors verified; cancellation and shutdown planned. |
 
 ### Initial HTTP Host Verification
@@ -409,6 +410,24 @@ cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
 Six library tests, four executable unit tests, and the standalone worker integration target passed. The four new conversion tests preserve a 302 response, Location, two distinct Set-Cookie values in order, and exact UTF-8 body bytes. Rejection cases include invalid and informational status numbers, an invalid header name, an embedded CRLF value, and mixed-case Content-Length, Transfer-Encoding, and Connection names. The status-body test rejects nonempty bodies for 204, 205, and 304 and accepts empty bodies for those statuses. Linker warning LNK4098 persists. No dependency changed.
 
 The conversion helper is not yet invoked by the live handler. Worker channels and the demonstration export still use string results; application metadata delivery, HEAD transport behavior through this helper, and invalid-response HTTP error mapping remain to be verified after connecting them. No network check was repeated for this helper-only step. The response model and conversion contain no engine handles, but the existing runtime initialization and module API still depend on deno_core. Full runtime-adapter separation, Angular compatibility, lifecycle controls, and performance measurement remain future work. The [rendering contract](rendering-contract.md#implemented-http-response-conversion) records the current policy and limitations.
+
+### Structured Response Transport Verification
+
+Later on 2026-10-10, the author connected `RenderResponse` across the complete implemented host path. `RenderJob` replies and `Renderer::render` now carry this type, and the worker selects `call_export::<_, RenderResponse>`. The demonstration returns status, header pairs, and buffered body in a JavaScript object. The Axum handler returns `Response` and invokes `into_http_response`; rejected metadata produces HTTP 500 with the public text `Rendering failed.` and a server-side diagnostic containing the host-generated request identifier. Application status 404 or a redirect remains a normal response result.
+
+The following repository checks passed after the author completed the edits:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+Six library tests, four executable unit tests, and the standalone integration target passed. The latter printed `Renderer response and error checks passed.` Successful calls 1, 3, and 5 preserve statuses 302, 404, and 200, exact content-type and two Set-Cookie pairs, Location on the redirect, and a Unicode body containing the original identifier, URL, and method. Call 2 throws; call 4 supplies an object where `body: String` is required. Successful calls after each failure verify continued ordinary worker execution. The fixture still uses empty request-header lists and is synchronous. Linker warning LNK4098 persists; no repository dependency changed.
+
+A prior proposal check in a temporary copy also exercised the actual handler through an Axum Router. It verified 200 and 404 body bytes, two separate cookies, HTML content type, UTF-8 representation length, empty HEAD delivery, redirect Location for GET and HEAD, and generic HTTP 500 for invalid status, forbidden Content-Length, a nonempty 204 body, malformed result shape, and an execution exception. A final valid request succeeded after those failures. That router test, its controlled fixture, and a direct Tower dependency remained confined to the temporary copy. A second temporary check of the author's files passed the existing suite after the pending signature correction; the final repository checks above verify the author's completed source.
+
+These are correctness checks. Network delivery was not repeated for this milestone, and the additional router checks are not retained regression coverage. An explicit unmatched Angular outcome, asynchronous renderer proof, native services, request isolation, deadlines, worker lifecycle, Angular SSR and hydration, and performance measurement remain future work. The [rendering contract](rendering-contract.md#structured-response-transport-evidence) records the implemented boundary and its verification limits.
 
 ## Open Questions
 

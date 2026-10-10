@@ -3,13 +3,13 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Request object and generic result conversion implemented; HTTP response conversion unit-tested but not connected to the handler; Angular adapter not implemented
+**Implementation:** Structured request and response transport connected to the HTTP handler; Angular adapter not implemented
 
 ## Purpose and Context
 
 The rendering contract defines the boundary between the Rust HTTP host and the application's Angular renderer. It specifies request information, response outcomes, lifecycle responsibilities, and failure behavior.
 
-This is a semantic contract for the intended prototype. The current implementation passes an object containing a string request identifier, URL, method, and text header pairs to a JavaScript `render(request)` export and receives an HTML string. The complete Angular adapter's Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
+This is a semantic contract for the intended prototype. The current implementation passes an object containing a string request identifier, URL, method, and text header pairs to a JavaScript `render(request)` export and receives a structured status, header list, and buffered body. The Rust handler validates that response before HTTP delivery. The complete Angular adapter's Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
 
 The intended boundary permits a future runtime replacement without changing application-facing request semantics. Engine lifecycle and integration work still belong to the replacement adapter.
 
@@ -51,7 +51,7 @@ AngularAppEngine is a candidate public integration point because its handle meth
 
 ### Implemented Request Object Boundary
 
-`Renderer::render(request: RenderRequest)` accepts an owned Rust request. The public [RenderRequest](../../crates/rubicon/src/request.rs) contains `request_id: String`, `url: String`, `method: String`, and `headers: Vec<(String, String)>` and derives `serde::Serialize`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request`; the generic `JavaScriptRuntime::call_export<TArgument, TResult>` converts it directly into a V8 object through `serde_v8::to_v8` and invokes the export through `call_with_args`. The argument requires `serde::Serialize`, while the result requires `serde::de::DeserializeOwned` and is converted through `serde_v8::from_v8::<TResult>`. The worker currently selects `String` as the result type. The identifier becomes a JavaScript string and header pairs become JavaScript arrays. Values are not interpolated into JavaScript source. The module's `render(request)` export returns a string that the host delivers through Axum's `Html` response.
+`Renderer::render(request: RenderRequest)` accepts an owned Rust request and returns `Result<RenderResponse, RenderError>`. The public [RenderRequest](../../crates/rubicon/src/request.rs) contains `request_id: String`, `url: String`, `method: String`, and `headers: Vec<(String, String)>` and derives `serde::Serialize`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request`; the generic `JavaScriptRuntime::call_export<TArgument, TResult>` converts it directly into a V8 object through `serde_v8::to_v8` and invokes the export through `call_with_args`. The argument requires `serde::Serialize`, while the result requires `serde::de::DeserializeOwned` and is converted through `serde_v8::from_v8::<TResult>`. The worker selects `RenderResponse` as the result type. The identifier becomes a JavaScript string and header pairs become JavaScript arrays. Values are not interpolated into JavaScript source. The module's `render(request)` export returns an object whose status, headers, and body reach the HTTP handler through the owned response model.
 
 GET handlers for `/` and `/{*path}` obtain `OriginalUri` and append its original path and query to the fixed application origin `http://127.0.0.1:3000`. The host does not decode or reconstruct query parameters. Source review confirms that request `Host` and forwarded headers are not used to construct this origin; header-spoofing behavior has not been separately exercised. Configurable origins, trusted proxies, and URL size and validation policies remain open.
 
@@ -61,7 +61,7 @@ The handler extracts `HeaderMap` and converts each value into a separate name-va
 
 The HTTP handler generates a decimal `request_id` from a process-local atomic counter initialized to 1 before converting headers. `checked_add` prevents wrapping; the last emitted identifier is `u64::MAX - 1`, and subsequent calls at `u64::MAX` produce HTTP 503 with `Request identifiers exhausted.` Client-supplied `X-Request-ID` does not select the identifier. Rejected headers consume an identifier without entering the renderer. Identifiers reset on process restart and are not globally unique or authentication credentials. Direct `Renderer` callers supply their own identifier; the library does not generate or validate uniqueness. The demonstration escapes the identifier as HTML text, and the host retains a clone for rendering-failure logs. It does not yet include an identifier response header or cover requests rejected outside the page handler.
 
-The job currently contains identifier, URL, method, and header pairs from the request model. Context, native services, and lifecycle controls remain to be added. A string result also does not implement the complete terminal-outcome and response-metadata models below. Axum omits the HEAD body, and the demonstration's Content-Length matches the corresponding GET representation. Full RC-05 acceptance still requires the complete application response-metadata model.
+The job currently contains identifier, URL, method, and header pairs from the request model. Context, native services, and lifecycle controls remain to be added. The structured response supports status, repeated headers, and buffered content; the complete terminal-outcome model below remains unfinished. Axum omits the HEAD body, with representation length computed from the buffered body. Full RC-05 acceptance still requires Angular integration and broader transport verification.
 
 ### Request Model
 
@@ -82,21 +82,21 @@ The library exposes [RenderResponse](../../crates/rubicon/src/response.rs) throu
 
 | Field | Rust type | Intended meaning |
 | --- | --- | --- |
-| `status` | `u16` | Final HTTP status; the conversion helper accepts 200 through 599 and checks selected body rules. Its use by the HTTP handler remains pending. |
+| `status` | `u16` | Final HTTP status; the HTTP handler invokes the conversion helper, which accepts 200 through 599 and checks selected body rules. |
 | `headers` | `Vec<(String, String)>` | Response name-value pairs, capable of representing repeated fields such as Set-Cookie. |
 | `body` | `String` | Buffered UTF-8 response content. |
 
-The data type, public export, and generic runtime result conversion are implemented. Calling `call_export::<_, RenderResponse>` selects this structure instead of a string. A prior proposal check in a temporary copy verified status 201, two separate Set-Cookie pairs, Unicode body content, an exact large request identifier, and successful calls after conversion and JavaScript errors. The additional test and fixture remained in that temporary copy. The repository suite continues to exercise `String` through the worker, which still transports a string; the HTTP handler still delivers it through `Html`. Result conversion failures use the prefix `Result conversion failed:`. The HTTP conversion helper below is now implemented and unit-tested, but its connection to the worker and handler remains pending. The complete RC-03 and RC-04 outcomes are not implemented. No dependency was added. See the [generic export verification](architecture.md#generic-export-verification).
+The data type, public export, generic runtime conversion, worker transport, and handler connection are implemented. The worker calls `call_export::<_, RenderResponse>` and returns the owned structure through its reply channel. The repository integration fixture verifies status 302 with Location, 404 and 200 responses, two distinct Set-Cookie pairs, Unicode body content, exact large request identifiers, and successful calls after execution and body-conversion errors. Result conversion failures use the prefix `Result conversion failed:`. The HTTP handler invokes the conversion helper below before delivery. An explicit unmatched-route result and complete RC-03 outcomes remain future work. No dependency was added. See the [structured response verification](architecture.md#structured-response-transport-verification).
 
 ### Implemented HTTP Response Conversion
 
 The public [into_http_response](../../crates/rubicon/src/http_response.rs) accepts a `RenderResponse` and returns `Result<axum::response::Response, String>`. It validates the complete supplied header list before returning a response. The current host policy accepts final statuses from 200 through 599 and rejects all other numbers, including informational statuses. Nonempty bodies for 204, 205, and 304 are rejected rather than silently discarded; the absence-of-content rules follow [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-15).
 
-Header names and values are parsed with `HeaderName::from_bytes` and `HeaderValue::from_str`. Parsed names are normalized before applying the transport-header policy. The helper rejects Connection, Content-Length, Transfer-Encoding, Keep-Alive, Proxy-Connection, TE, Trailer, and Upgrade. These fields remain controlled by the HTTP server. This prototype policy also rejects application-supplied optional Content-Length metadata for HEAD or 304; representation-length behavior must be verified when the helper is connected to the handler.
+Header names and values are parsed with `HeaderName::from_bytes` and `HeaderValue::from_str`. Parsed names are normalized before applying the transport-header policy. The helper rejects Connection, Content-Length, Transfer-Encoding, Keep-Alive, Proxy-Connection, TE, Trailer, and Upgrade. These fields remain controlled by the HTTP server. This prototype policy also rejects application-supplied optional Content-Length metadata for HEAD or 304. A temporary router check verified HEAD length derived from a buffered GET representation; optional application length metadata remains unsupported.
 
 Accepted pairs are appended to `HeaderMap`, preserving separate Set-Cookie values and their order. The body is moved into `Body::from`, and the validated status and headers are assigned to the Axum response. The helper supplies no default Content-Type, calculates no Content-Length header itself, and does not validate all status-specific application semantics. Applications must supply their intended content type. Response-size limits, conditional-request handling, and actual HTTP transport behavior remain separate work.
 
-Four repository unit tests verify status 302 with Location, two distinct cookies, exact Unicode body bytes, rejected status numbers, invalid header syntax, rejected renderer framing headers, and empty-body requirements. These are response-object checks, not network delivery evidence. The live worker and handler still use the earlier string-result path. See the [conversion verification](architecture.md#http-response-conversion-verification).
+Four repository unit tests verify status 302 with Location, two distinct cookies, exact Unicode body bytes, rejected status numbers, invalid header syntax, rejected renderer framing headers, and empty-body requirements. The live worker and handler now use the structured response path. Additional temporary router checks verified metadata delivery, HEAD omission, generic 500 responses for invalid results and metadata, and a subsequent valid request. These are response-object and router checks, not new network delivery evidence. See the [structured response verification](architecture.md#structured-response-transport-verification).
 
 ### Terminal Outcomes
 
@@ -165,8 +165,8 @@ The benchmark must account for conversion and data-copy costs. Streaming would r
 | RC-01 | Exercise query parameters, direct route access, methods, repeated headers, and identifiers. | Request conversion, concurrent identifier generation, and exhaustion checks. | Partial: URL path/query, GET/HEAD method, repeated text headers, and process-local string identifiers verified; arbitrary header bytes unsupported. |
 | RC-02 | Alternate contexts and complete an operation after cancellation. | Request-scope checks. | Planned |
 | RC-03 | Exercise each terminal outcome and attempted late completion. | Outcome checks. | Planned |
-| RC-04 | Check status, redirects, Set-Cookie, and body content. | Response-object and HTTP delivery checks. | Partial: response-object conversion and successful 200 HTML delivery verified; application metadata transport planned. |
-| RC-05 | Compare GET representation metadata with HEAD delivery. | HTTP delivery checks. | Partial: empty body and demonstration GET representation length verified; complete application metadata planned. |
+| RC-04 | Check status, redirects, Set-Cookie, and body content. | Response-object and HTTP delivery checks. | Partial: structured worker metadata and body preservation verified; temporary router delivery checks passed; network and Angular integration remain planned. |
+| RC-05 | Compare GET representation metadata with HEAD delivery. | HTTP delivery checks. | Partial: earlier demonstration network evidence and temporary structured-response router checks verify body omission and representation length; Angular metadata and broader transport coverage remain planned. |
 | RC-06, RC-07 | Expire or cancel work, then render a new request on recovered capacity. | Cleanup and recovery checks. | Partial: continued execution after ordinary JavaScript and conversion errors verified; cancellation, cleanup, and replacement planned. |
 | RC-08 | Hydrate a page and perform a representative interaction. | Browser check. | Planned |
 | RC-09 | Compare public error responses with internal diagnostics. | Failure reporting review. | Planned |
@@ -207,11 +207,17 @@ Actual HTTP checks generated identifiers 1, 2, and 3 for GET / HEAD / GET despit
 
 These checks support process-local identity and lossless string transfer. They do not verify authentication, request-context isolation, globally unique identifiers, lifecycle controls, complete application response metadata, Angular compatibility, or performance gains.
 
+### Structured Response Transport Evidence
+
+On 2026-10-10, formatting, locked offline compilation for all targets, and the complete repository test suite passed with the connected response path. Six library tests, four executable unit tests, and the standalone worker integration target succeeded. Integration comparisons verify status, exact header pairs, and Unicode body content for successful calls 1, 3, and 5; ordinary execution and body-conversion failures on calls 2 and 4 do not prevent later results. An intentional application 404 remains a successful `RenderResponse`.
+
+A temporary proposal check exercised the handler through an Axum Router, verifying redirects, repeated cookies, UTF-8 body length, empty HEAD bodies, and generic 500 mapping for execution errors, malformed results, and invalid HTTP metadata. Those tests and their Tower dependency are not retained in the repository, and new network checks were not run for this milestone. The [architecture milestone](architecture.md#structured-response-transport-verification) records exact cases and limits. Angular outcomes, async rendering, context isolation, cancellation, cleanup, and performance remain unverified.
+
 ## Open Questions
 
 | Question | Impact | Next action |
 | --- | --- | --- |
-| What complete module export and Rust/TypeScript types implement the Angular boundary? | Defines application integration beyond the current request object and HTML string result. | Extend the request prototype through the Angular renderer spike. |
+| What complete module export and Rust/TypeScript types implement the Angular boundary? | Defines Angular application integration beyond the current structured request and response objects. | Extend the prototype through the Angular renderer spike. |
 | Which context fields and encodings are supported? | Defines data compatibility and size limits. | Specify the example service and transfer needs. |
 | How are asynchronous native operations cancelled? | Defines cleanup guarantees. | Prototype success, failure, and late completion. |
 | What is the effective URL and trusted-proxy policy? | Affects routing and request validation. | Select a deployment configuration. |

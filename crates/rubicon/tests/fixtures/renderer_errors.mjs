@@ -8,8 +8,27 @@ export function render(request) {
     }
 
     if (renderCount === 4) {
-        return { invalid: true };
+        return {
+            status: 200,
+            headers: [],
+            body: { invalid: true },
+        };
     }
 
-    return `<p>Request ID: ${request.request_id}</p><p>Render ${renderCount}</p><p>Method: ${request.method}</p><p>URL: ${request.url}</p>`;
+    const status = renderCount === 1 ? 302 : renderCount === 3 ? 404 : 200;
+    const headers = [
+        ["content-type", "text/html; charset=utf-8"],
+        ["set-cookie", "first=1; Path=/"],
+        ["set-cookie", "second=2; Path=/"],
+    ];
+
+    if (status === 302) {
+        headers.push(["location", "/products"]);
+    }
+
+    return {
+        status,
+        headers,
+        body: `<p>Răspuns</p><p>Request ID: ${request.request_id}</p><p>Render ${renderCount}</p><p>Method: ${request.method}</p><p>URL: ${request.url}</p>`,
+    };
 }
