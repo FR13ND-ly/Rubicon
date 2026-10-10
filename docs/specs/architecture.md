@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** HTTP-to-JavaScript worker prototype; Angular SSR not implemented
+**Implementation:** HTTP-to-JavaScript worker prototype and Node.js Angular SSR reference; Angular integration into Rubicon pending
 
 ## Purpose and Context
 
@@ -447,6 +447,25 @@ Six library tests and four executable unit tests passed. The standalone integrat
 
 This verifies one relative ES-module import, Promise fulfillment, a rejection after an awaited microtask, typed conversion after fulfillment, and continued ordinary worker execution. It does not verify timers, network I/O, asynchronous Rust operations, permanently pending Promises, cancellation, interruption, rollback of side effects, or full request isolation. The live demonstration remains synchronous, and HTTP behavior was not rechecked for this test-only step. Angular compatibility, hydration, and performance remain unverified. See the [rendering-contract evidence](rendering-contract.md#asynchronous-renderer-evidence) and [runtime decision evidence](../adr/001-runtime-selection.md#asynchronous-renderer-verification).
 
+### Angular Node.js Reference Verification
+
+On 2026-10-10, the author generated `examples/angular-demo` with Angular CLI 22.2.2, routing, SSR, CSS, and zoneless configuration. All eleven direct Angular dependencies are pinned exactly to 22.2.2 in both package.json and the root requirements of package-lock.json; their resolved and installed versions match. The verification environment uses Node.js v24.19.0, npm 11.17.0, TypeScript 6.0.3, and Express 5.3.0.
+
+The application configures the server catch-all route with `RenderMode.Server`, the application builder with `outputMode: "server"`, and `security.allowedHosts` with `localhost` and `127.0.0.1`. The initial empty host list produced HTTP 400 with `Header "host" with value "localhost:4000" is not allowed.` Configuring the local hostnames and rebuilding resolved that failure. Exact dependency pins and a subsequent npm install also resolved a temporary mismatch between the manifest and installed packages.
+
+The following checks passed from the application directory:
+
+```text
+npm.cmd ls --depth=0
+npm.cmd run build
+```
+
+The production build generated browser and server directories, including `server.mjs`, `main.server.mjs`, and `polyfills.server.mjs`. It reported zero prerendered routes, and `prerendered-routes.json` contained an empty routes object. These filenames describe this build; a later version or configuration may produce a different artifact layout.
+
+A temporary process served that final build with `PORT=4107`, independently of the author's normal port 4000. HTTP GET to `/` through both `localhost` and `127.0.0.1` returned 200. The localhost response used HTML content type and contained the `Hello, angular-demo` heading, `ng-server-context="ssr"`, hydration annotations, and Angular state. A subsequent GET for the browser module referenced by that HTML returned 200 with JavaScript content type. The verification process was stopped after these checks; generated output and local captures remain outside version control.
+
+This establishes conventional Node.js SSR and browser asset delivery for the welcome application. The presence of hydration annotations does not establish successful browser hydration. Routed pages, a representative interaction, browser diagnostics, and performance measurement remain pending. The generated Node entrypoint uses `@angular/ssr/node`, Express, and Node APIs; it is not yet loadable through Rubicon's bare deno_core environment. AngularAppEngine remains an integration candidate requiring environment and module-loading work. See the [reference setup](../../examples/angular-demo/README.md). The runtime ADR remains Draft.
+
 ## Open Questions
 
 | Question | Impact | Next action |
@@ -463,7 +482,7 @@ This verifies one relative ES-module import, Promise fulfillment, a rejection af
 - [Rendering contract](rendering-contract.md).
 - [Benchmark protocol](benchmark-protocol.md).
 - [ADR 001: JavaScript runtime selection](../adr/001-runtime-selection.md).
-- [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-09; selected Angular version TBD.
+- [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-10; reference application pinned to Angular 22.2.2.
 - [deno_core JsRuntime](https://docs.rs/deno_core/latest/deno_core/struct.JsRuntime.html), documentation observed at 0.412.0 on 2026-10-09; prototype dependency pinned to 0.412.0.
 - [Axum serve API](https://docs.rs/axum/latest/axum/fn.serve.html), rolling documentation observed at 0.8.9 on 2026-10-10; prototype dependency pinned to 0.8.9.
 - [Tokio bounded channel submission](https://docs.rs/tokio/latest/tokio/sync/mpsc/struct.Sender.html#method.try_send), documentation observed at 1.53.2 on 2026-10-10; prototype dependency pinned to 1.53.2.

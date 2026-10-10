@@ -14,12 +14,15 @@ See the [template catalog](templates/readme.md) for specification and architectu
 
 ## Project Documents
 
-The following documents contain initial drafts for author review. Specifications describe proposed behavior; the architecture records the verified HTTP-to-JavaScript worker prototype, its queue rejection check, and continued execution after ordinary renderer errors. The rendering contract records the public owned `RenderRequest` containing a string identifier, URL, method, and repeated header pairs, including the provisional text-value policy. Executable tests verify repeated header conversion, unsupported-value rejection, identifier uniqueness across threads, and exhaustion without wrapping. Worker checks preserve large identifiers as strings; HTTP checks verify host-generated identity, escaped demonstration values, and an identifier consumed by a rejected request without advancing the render counter. Identifiers are unique within one server execution and reset on restart. HEAD body omission and demonstration Content-Length matching the GET representation are verified. The runtime ADR records verified capabilities including local ES module loading and repeated calls returning HTML. The complete request/response contract, request isolation, Angular SSR integration, and performance evaluation remain future work:
+The following documents contain drafts for author review and evidence of completed prototype steps. The Rust host transports owned request and response objects through a persistent JavaScript worker, validates response metadata, and maps rendering failures to HTTP errors. Checks cover request identifiers, repeated headers, controlled queue rejection, structured response conversion, Promise fulfillment and rejection, and continued execution after ordinary failures. The architecture records the commands, outcomes, and limits of each milestone.
+
+A separate Angular 22.2.2 application now builds and serves server-rendered welcome content through its conventional Node.js entrypoint. Its setup and reproduction commands are documented alongside the application. Browser hydration, Angular execution inside Rubicon, request isolation, native services, and performance evaluation remain pending.
 
 1. [Project overview](specs/project-overview.md)
 2. [Architecture](specs/architecture.md)
 3. [Rendering contract](specs/rendering-contract.md)
 4. [Benchmark protocol](specs/benchmark-protocol.md)
 5. [Runtime selection ADR](adr/001-runtime-selection.md)
+6. [Angular reference application](../examples/angular-demo/README.md)
 
 Update this index when document status changes or new documents are added.

@@ -2,7 +2,9 @@
 
 Rubicon is a bachelor's thesis project exploring a Rust-hosted server-side rendering framework for Angular. The proposed architecture uses Rust for HTTP handling and application services, with an embedded JavaScript runtime for Angular rendering.
 
-The repository currently contains initial documentation drafts and an Axum HTTP server connected to a persistent JavaScript rendering worker. Angular runtime integration and performance improvements remain to be implemented and evaluated.
+The repository contains documentation drafts, an Axum HTTP server connected to a persistent JavaScript rendering worker, and an Angular SSR reference application running on Node.js. Integrating Angular into the Rust-owned runtime and evaluating performance remain future work.
+
+The [Angular reference application](examples/angular-demo/README.md) pins all direct Angular packages to 22.2.2. Its production build and HTTP delivery of server-rendered welcome content and the matching browser JavaScript bundle have been verified. It uses explicit `RenderMode.Server` routes and accepts the local hostnames `localhost` and `127.0.0.1`. Browser hydration and interaction checks remain pending. This application establishes a conventional hosting reference for later compatibility work; it does not yet consume Rubicon or provide benchmark results.
 
 The Rust package is defined in [crates/rubicon/Cargo.toml](crates/rubicon/Cargo.toml), with Axum pinned to 0.8.9, deno_core to 0.412.0, Tokio to 1.53.2, and Serde to 1.0.229. The executable listens on `127.0.0.1:3000`; GET and HEAD requests to `/` and `/{*path}` invoke the `render(request)` export from [render.mjs](crates/rubicon/js/render.mjs). Successful responses use `200 OK` and `Content-Type: text/html; charset=utf-8`; GET delivers the returned HTML and HEAD omits its body.
 

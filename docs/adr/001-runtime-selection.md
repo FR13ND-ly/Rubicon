@@ -107,7 +107,7 @@ If a significant accepted decision is later superseded, create a replacement ADR
 - [Deno Core README](https://github.com/denoland/deno/blob/main/libs/core/README.md), rolling main branch checked on 2026-10-09.
 - [deno_core JsRuntime](https://docs.rs/deno_core/latest/deno_core/struct.JsRuntime.html), documentation observed at 0.412.0 on 2026-10-09; the first synchronous execution prototype pins deno_core to 0.412.0 in Cargo.toml and records resolved dependencies in Cargo.lock.
 - [Deno runtime implementation](https://docs.rs/deno_runtime/latest/src/deno_runtime/worker.rs.html), rolling latest documentation checked on 2026-10-09; selected dependency version TBD.
-- [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-09; selected Angular version TBD.
+- [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-10; reference application pinned to Angular 22.2.2.
 - [Bun Rust rewrite announcement](https://bun.com/blog/bun-in-rust), checked on 2026-10-09.
 - [Official Bun embedding feature request](https://github.com/oven-sh/bun/issues/12017), open status checked on 2026-10-09.
 - [Community libbun project](https://github.com/enki/libbun), project claims and documented integration checked on 2026-10-09; no local validation performed.
@@ -192,6 +192,12 @@ Repository formatting, locked offline compilation for all targets, and the compl
 
 This verifies a small local import graph and Promise/microtask behavior for the pinned deno_core candidate. It does not verify the Angular artifact environment, timers or native I/O, cancellation, cleanup, isolation, or performance. The ADR remains Draft, with acceptance conditions unchanged.
 
+### Angular Node.js Reference
+
+On 2026-10-10, the author added a separate Angular 22.2.2 SSR application with exact direct Angular version pins and package-lock.json. Its conventional Node.js production build and HTTP delivery passed: the welcome heading was present in server-rendered HTML, and the matching browser JavaScript asset was served successfully. Local host validation is explicitly configured, and the build prerenders zero routes. The [architecture evidence](../specs/architecture.md#angular-nodejs-reference-verification) records the environment, checks, and resolved setup failures; the [application README](../../examples/angular-demo/README.md) provides reproduction commands.
+
+The generated Node entrypoint is a reference implementation for subsequent artifact and environment inspection. It does not prove execution inside deno_core, successful browser hydration, asynchronous native services, isolation, cleanup, or a performance improvement. This milestone selects the first Angular version to investigate but leaves the runtime decision and its acceptance conditions in Draft.
+
 ## Decision History
 
 | Date | Change | Reason |
@@ -202,3 +208,4 @@ This verifies a small local import graph and Promise/microtask behavior for the 
 | 2026-10-09 | Record continued execution after synchronous errors. | Verify execution and conversion error propagation and valid subsequent execution on the same runtime. |
 | 2026-10-09 | Record local ES module loading and HTML return values. | Verify loading once and calling the synchronous exported renderer twice through asynchronous Rust orchestration. |
 | 2026-10-10 | Record Promise-returning renderer checks. | Verify a local import, fulfillment, rejection after an awaited microtask, typed response conversion, and continued execution while keeping native I/O and Angular acceptance pending. |
+| 2026-10-10 | Record Angular 22.2.2 on the conventional Node.js server. | Establish a pinned application and verified SSR reference before embedded-runtime compatibility work. |

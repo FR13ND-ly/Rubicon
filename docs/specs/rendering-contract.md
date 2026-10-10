@@ -234,7 +234,7 @@ Six library tests and four executable unit tests passed, and both fixture succes
 - [Architecture](architecture.md).
 - [Benchmark protocol](benchmark-protocol.md).
 - [ADR 001: JavaScript runtime selection](../adr/001-runtime-selection.md).
-- [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-09; selected Angular version TBD.
+- [AngularAppEngine API](https://angular.dev/api/ssr/AngularAppEngine), rolling documentation checked on 2026-10-10; reference application pinned to Angular 22.2.2, with the Rubicon adapter still pending.
 - [Angular hydration](https://angular.dev/guide/hydration), rolling documentation checked on 2026-10-09.
 - [Angular TransferState](https://angular.dev/api/core/TransferState), rolling documentation checked on 2026-10-09.
 - [Angular SSR guide](https://angular.dev/guide/ssr), request context and transfer-cache documentation checked on 2026-10-09.
