@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** String request identifier, URL, method, and text header pairs; demonstration HEAD metadata verified; Angular adapter not implemented
+**Implementation:** Request object and demonstration HEAD metadata verified; RenderResponse type defined but not connected; Angular adapter not implemented
 
 ## Purpose and Context
 
@@ -75,6 +75,18 @@ The job currently contains identifier, URL, method, and header pairs from the re
 | Deadline and cancellation state | Controls how long work remains eligible. | Host-owned lifecycle controls; their runtime representation is adapter-specific. |
 
 User identity in context must come from the configured authentication mechanism. An arbitrary context field is not an authorization decision. Server-only credentials and native resource handles are not automatically serialized to the browser.
+
+### Defined Response Type
+
+The library exposes [RenderResponse](../../crates/rubicon/src/response.rs) through `rubicon::RenderResponse`. It derives `Debug` and `serde::Deserialize` and contains:
+
+| Field | Rust type | Intended meaning |
+| --- | --- | --- |
+| `status` | `u16` | Final HTTP status; valid status and body rules still require host validation. |
+| `headers` | `Vec<(String, String)>` | Response name-value pairs, capable of representing repeated fields such as Set-Cookie. |
+| `body` | `String` | Buffered UTF-8 response content. |
+
+At this milestone, only the data type and public export are implemented. `Deserialize` enables a later conversion into the type; a JavaScript-to-Rust response conversion has not yet been exercised. The worker still transports a string, and the HTTP handler still delivers it through `Html`. Header validation, transport-owned header policy, repeated-field delivery, application status delivery, redirects, and body restrictions remain future work. Defining the type does not establish RC-03 or RC-04 acceptance. No dependency was added.
 
 ### Terminal Outcomes
 

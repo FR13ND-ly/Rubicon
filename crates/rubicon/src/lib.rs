@@ -5,9 +5,11 @@ use deno_core::{
 };
 mod renderer;
 mod request;
+mod response;
 
 pub use renderer::{RenderError, Renderer};
 pub use request::RenderRequest;
+pub use response::RenderResponse;
 
 pub struct JavaScriptRuntime {
     inner: JsRuntime,

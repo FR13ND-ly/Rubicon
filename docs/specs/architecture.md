@@ -363,6 +363,19 @@ A raw HTTP request containing the unsupported header byte `0xff` returned 400 wi
 
 These checks establish process-local identifier generation and exact string transfer through the worker. They do not establish authentication, request-context isolation, cleanup, complete response outcomes, Angular SSR, or performance improvements. Performance remains unmeasured.
 
+### Response Type Definition Verification
+
+Later on 2026-10-10, the author added `src/response.rs` containing `RenderResponse` with `status: u16`, `headers: Vec<(String, String)>`, and `body: String`, deriving `Debug` and `serde::Deserialize`. The library declares the module and publicly re-exports the type. Response data remains independent of Axum-specific types. The header list can represent repeated names without replacing an earlier value.
+
+The following repository checks passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+```
+
+These checks establish that the new model and public export compile with all existing targets. The runtime, worker, HTTP handler, and JavaScript fixtures still use the existing string-result flow. No new test or HTTP check was required for this type-only step, and no dependency changed. V8 deserialization, structured worker results, HTTP metadata validation and delivery, and the complete terminal-outcome model remain to be implemented and verified. No performance claim follows from this change. See the [response type definition](rendering-contract.md#defined-response-type).
+
 ## Open Questions
 
 | Question | Impact | Next action |
