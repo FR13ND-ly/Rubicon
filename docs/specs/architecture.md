@@ -38,18 +38,18 @@ The current executable initializes the V8 platform on the main thread and starts
 
 Startup waits for a one-shot module-initialization result before binding the HTTP listener. This confirms runtime creation and module evaluation; the `render` export is checked when invoked, so this handshake does not establish full application rendering readiness.
 
-Axum stores a cloneable `Renderer` in application state. GET handlers for `/` and `/{*path}` extract `OriginalUri`, combine its path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest { url }`. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request.url`, passes it as a V8 string value to the module's `render(url)` export, converts the result to a Rust string, and returns it to the handler as buffered HTML.
+Axum stores a cloneable `Renderer` in application state. Handlers registered through `get` for `/` and `/{*path}` also receive HEAD requests. They extract `OriginalUri` and `Method`, combine the original path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest` containing URL and method. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request`, converts it directly into a V8 object through `serde_v8::to_v8`, and invokes the module's `render(request)` export. The result becomes a Rust string returned as buffered HTML; Axum omits the HEAD body.
 
 The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one job at a time. Submission uses `try_send`, so a full queue is rejected immediately rather than creating additional tasks waiting to enqueue. This bounds queued render jobs, not all HTTP connections or total process memory. The value is provisional and has not been tuned by benchmarks.
 
 | Current outcome | HTTP behavior |
 | --- | --- |
-| String returned by `render` | 200 with HTML content type and the returned body. |
+| String returned by `render` | 200 with HTML content type; GET delivers the returned body and HEAD omits it. |
 | Queue full | 503 with a generic busy response. |
 | Worker channel or reply channel closed | 503 with a generic unavailable response. |
 | Export execution or result conversion fails | 500 with a generic failure response; details are logged server-side. |
 
-The demonstration module displays the URL using HTML text escaping and maintains a render counter to show engine and module persistence. A job currently carries only the URL field of the proposed request model. Retaining this diagnostic counter and returning the current URL do not verify isolation of user data or request cleanup. The following Angular request flow remains a proposal.
+The demonstration module displays URL and method using HTML text escaping and maintains a render counter to show engine and module persistence. A job currently carries only those two fields of the proposed request model. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. HEAD's Content-Length currently reflects the method-specific demonstration HTML; aligning it with the GET representation is still required. The following Angular request flow remains a proposal.
 
 ### Proposed Components
 
@@ -111,7 +111,7 @@ Angular remains responsible for matching application routes during rendering. Th
 | Worker to Angular adapter | Serializable request information and scoped service access | Response, no matching route, or failure | The worker reports the failure and cleans up. |
 | Adapter to native service | Request-scoped operation and arguments | Data or explicit error | Late results cannot affect a different request. |
 
-The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The demonstration currently uses `render(url)`; configuration format, the complete Angular adapter interface, and service-operation names remain TBD.
+The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The demonstration currently uses `render(request)` with URL and method fields; configuration format, the complete Angular adapter interface, and service-operation names remain TBD.
 
 The initial response is buffered HTML. The matching browser artifacts must come from the same application build. Any HTML processing must preserve the structure and state required for hydration.
 
@@ -162,7 +162,7 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 | ARCH-04 | Offer work above capacity and inspect admission and queue counts. | Scheduler checks and overload run. | Partial: controlled queue rejection verified; configured scheduling and HTTP overload planned. |
 | ARCH-05 | Alternate identities and verify cleanup after successful and failed renders. | Isolation checks and sustained-operation run. | Planned |
 | ARCH-06 | Exercise service success, failure, and late completion. | Native-service integration checks. | Planned |
-| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: URL propagation and successful HTML delivery verified; complete response contract planned. |
+| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: URL/method propagation, successful HTML delivery, and HEAD body omission verified; HEAD length correction and complete response contract remain open. |
 | ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Partial: continued execution after ordinary renderer errors verified; cancellation and shutdown planned. |
 
 ### Initial HTTP Host Verification
@@ -249,7 +249,7 @@ This verifies the request URL's passage through the HTTP handler, worker queue, 
 
 ### Owned Request Type Verification
 
-On 2026-10-10, the author added `src/request.rs` with a public `RenderRequest` containing `url: String`, re-exported it from the library, and changed `Renderer::render` to accept that owned type. The executable, queue test, and integration helper now construct the request explicitly. Ownership moves into the queued job; the worker borrows its URL for the existing runtime call. No new dependency was introduced.
+On 2026-10-10, the author added `src/request.rs` with a public `RenderRequest` containing `url: String`, re-exported it from the library, and changed `Renderer::render` to accept that owned type. At this milestone, the executable, queue test, and integration helper constructed the request explicitly. Ownership moved into the queued job, and the worker borrowed its URL for the existing runtime call. No new dependency was introduced.
 
 The following repository checks passed:
 
@@ -261,7 +261,34 @@ cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
 
 The library reported two tests passed and zero failed, and the standalone integration executable printed `Renderer URL and error checks passed.` Binary and documentation test harnesses contained zero tests. The existing fixture still verifies exact URL association across successful calls and continued worker execution after ordinary errors. Linker warning LNK4098 persists.
 
-This refactor introduces a Rust request type without extending the implemented request semantics. JavaScript still receives a URL string. Method, headers, request identifier, context, and lifecycle fields remain future work. HTTP requests were not repeated for this refactor, and these checks do not establish performance improvements or full rendering-contract acceptance.
+This refactor introduced a Rust request type without extending the implemented request semantics. JavaScript still received a URL string at this milestone. Method, headers, request identifier, context, and lifecycle fields remained future work. HTTP requests were not repeated for this refactor, and these checks did not establish performance improvements or full rendering-contract acceptance.
+
+### Request Object and Method Verification
+
+Later on 2026-10-10, the author added Serde 1.0.229 as a direct dependency with its `derive` feature, retaining the version already selected in Cargo.lock. `RenderRequest` now derives `Serialize` and contains URL and method strings. The runtime export helper accepts a generic serializable argument and converts it directly through `serde_v8::to_v8`; the worker passes the complete request object. Axum's handler extracts the actual method, and the demonstration displays it with HTML text escaping.
+
+The controlled integration fixture echoes both fields. Successful calls 1, 3, and 5 verify GET/A, HEAD/B, and GET/A respectively; calls 2 and 4 retain the intentional JavaScript exception and non-string result. Exact string comparisons verify the current fields, query separators, and apostrophes after each ordinary failure. This verifies argument association, not user-context isolation.
+
+The following repository checks passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+curl.exe --max-time 5 -sS -i "http://127.0.0.1:3000/products?sort=asc&page=2"
+curl.exe --max-time 5 -sS -I "http://127.0.0.1:3000/products?sort=asc&page=2"
+curl.exe --max-time 5 -sS -i "http://127.0.0.1:3000/products?sort=asc&page=2"
+```
+
+Both library tests passed, and the standalone integration target printed `Renderer request and error checks passed.` Binary and documentation test harnesses contained zero tests. Linker warning LNK4098 persists. No argument-serialization failure was separately induced.
+
+All three requests to the author's already-running server returned 200 and `Content-Type: text/html; charset=utf-8`. The GET bodies displayed the original absolute URL with `&amp;`, `Method: GET`, and counters 3 and 5. Their Content-Length was 111. HEAD returned no body and reported Content-Length 112.
+
+The HEAD length reveals an incomplete metadata policy in the demonstration: displaying `HEAD` creates one extra byte compared with displaying `GET`. RFC 9110 section 8.6 requires a reported HEAD Content-Length to describe the corresponding GET content. The renderer must therefore align the demonstration's HEAD representation with GET before RC-05 can be accepted.
+
+A candidate adjustment displays `GET` in the page representation for both GET and HEAD, while retaining the actual method in the request object. A router test in a temporary copy passed with exact GET HTML, an empty HEAD body, and HEAD Content-Length matching the corresponding GET representation. The check used Tower only as a temporary test dependency. Neither the adjustment nor that temporary test has been added to the repository; the correction remains the next implementation step.
+
+Repeated headers, request identity, context, full response outcomes, asynchronous JavaScript rendering, Angular SSR, cleanup, interruption, and performance measurements remain future work. These checks establish the URL/method object boundary and observed body omission, not full HTTP-contract correctness.
 
 ## Open Questions
 
@@ -285,3 +312,4 @@ This refactor introduces a Rust request type without extending the implemented r
 - [Tokio bounded channel submission](https://docs.rs/tokio/latest/tokio/sync/mpsc/struct.Sender.html#method.try_send), documentation observed at 1.53.2 on 2026-10-10; prototype dependency pinned to 1.53.2.
 - [Angular library creation](https://angular.dev/tools/libraries/creating-libraries), rolling documentation checked on 2026-10-09.
 - [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html), rolling documentation checked on 2026-10-09.
+- [RFC 9110 Content-Length semantics](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6), checked on 2026-10-10 for HEAD representation metadata.

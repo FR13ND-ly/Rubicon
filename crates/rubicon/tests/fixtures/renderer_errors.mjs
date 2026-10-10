@@ -1,6 +1,6 @@
 let renderCount = 0;
 
-export function render(url) {
+export function render(request) {
     renderCount += 1;
 
     if (renderCount === 2) {
@@ -11,5 +11,5 @@ export function render(url) {
         return { invalid: true };
     }
 
-    return `<p>Render ${renderCount}</p><p>URL: ${url}</p>`;
+    return `<p>Render ${renderCount}</p><p>Method: ${request.method}</p><p>URL: ${request.url}</p>`;
 }

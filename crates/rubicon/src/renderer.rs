@@ -102,7 +102,7 @@ fn run_worker(
             }
 
             let result = runtime
-                .call_string_export(module_id, "render", &job.request.url)
+                .call_string_export(module_id, "render", &job.request)
                 .await;
 
             let _ = job.reply.send(result);
@@ -127,6 +127,7 @@ mod tests {
         for _ in 0..QUEUE_CAPACITY {
             let request = RenderRequest {
                 url: "http://127.0.0.1:3000/test".to_owned(),
+                method: "GET".to_owned(),
             };
             let (reply, response) = oneshot::channel();
 
@@ -143,6 +144,7 @@ mod tests {
             Duration::from_secs(2),
             renderer.render(RenderRequest {
                 url: "http://127.0.0.1:3000/test".to_owned(),
+                method: "GET".to_owned(),
             }),
         )
         .await

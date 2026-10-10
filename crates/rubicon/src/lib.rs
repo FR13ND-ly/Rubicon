@@ -67,11 +67,11 @@ impl JavaScriptRuntime {
         Ok(module_id)
     }
 
-    pub async fn call_string_export(
+    pub async fn call_string_export<T: serde::Serialize>(
         &mut self,
         module_id: ModuleId,
         export_name: &str,
-        argument: &str,
+        argument: &T,
     ) -> Result<String, String> {
         let namespace = self
             .inner
@@ -92,10 +92,8 @@ impl JavaScriptRuntime {
             let function = v8::Local::<v8::Function>::try_from(value)
                 .map_err(|_| format!("Export {export_name} must be a function"))?;
 
-            let argument = v8::String::new(scope, argument)
-                .ok_or_else(|| "Cannot allocate string argument".to_owned())?;
-
-            let argument: v8::Local<v8::Value> = argument.into();
+            let argument = serde_v8::to_v8(scope, argument)
+                .map_err(|error| format!("Argument conversion failed: {error}"))?;
 
             (
                 v8::Global::new(scope, function),

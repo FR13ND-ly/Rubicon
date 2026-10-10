@@ -14,7 +14,7 @@ See the [template catalog](templates/readme.md) for specification and architectu
 
 ## Project Documents
 
-The following documents contain initial drafts for author review. Specifications describe proposed behavior; the architecture records the verified HTTP-to-JavaScript worker prototype, its queue rejection check, and continued execution after ordinary renderer errors. The rendering contract records the implemented URL-only boundary, its public owned `RenderRequest`, and the HTTP and worker checks. The runtime ADR records verified capabilities including local ES module loading and repeated calls returning HTML. The complete request/response contract, request isolation, Angular SSR integration, and performance evaluation remain future work:
+The following documents contain initial drafts for author review. Specifications describe proposed behavior; the architecture records the verified HTTP-to-JavaScript worker prototype, its queue rejection check, and continued execution after ordinary renderer errors. The rendering contract records the request object containing URL and method, its public owned `RenderRequest`, and the HTTP and worker checks. HEAD body omission is verified, while its demonstration Content-Length still needs alignment with GET metadata. The runtime ADR records verified capabilities including local ES module loading and repeated calls returning HTML. The complete request/response contract, request isolation, Angular SSR integration, and performance evaluation remain future work:
 
 1. [Project overview](specs/project-overview.md)
 2. [Architecture](specs/architecture.md)

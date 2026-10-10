@@ -3,7 +3,7 @@ use std::path::Path;
 use axum::{
     Router,
     extract::{OriginalUri, State},
-    http::StatusCode,
+    http::{Method, StatusCode},
     response::Html,
     routing::get,
 };
@@ -40,6 +40,7 @@ async fn main() -> Result<(), String> {
 async fn root(
     State(renderer): State<Renderer>,
     OriginalUri(uri): OriginalUri,
+    method: Method,
 ) -> Result<Html<String>, (StatusCode, &'static str)> {
     let path_and_query = uri
         .path_and_query()
@@ -47,7 +48,10 @@ async fn root(
         .unwrap_or("/");
 
     let url = format!("{APPLICATION_ORIGIN}{path_and_query}");
-    let request = RenderRequest { url };
+    let request = RenderRequest {
+        url,
+        method: method.as_str().to_owned(),
+    };
 
     match renderer.render(request).await {
         Ok(html) => Ok(Html(html)),

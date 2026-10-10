@@ -3,19 +3,19 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Partial URL-only prototype with owned Rust request type; Angular adapter not implemented
+**Implementation:** Partial URL-and-method request object; Angular adapter not implemented; HEAD metadata correction pending
 
 ## Purpose and Context
 
 The rendering contract defines the boundary between the Rust HTTP host and the application's Angular renderer. It specifies request information, response outcomes, lifecycle responsibilities, and failure behavior.
 
-This is a semantic contract for the intended prototype. The current implementation passes a URL string to a JavaScript `render(url)` export and receives an HTML string. The complete Angular adapter's Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
+This is a semantic contract for the intended prototype. The current implementation passes an object containing URL and method to a JavaScript `render(request)` export and receives an HTML string. The complete Angular adapter's Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
 
 The intended boundary permits a future runtime replacement without changing application-facing request semantics. Engine lifecycle and integration work still belong to the replacement adapter.
 
 ## Scope
 
-The target scope covers buffered responses for GET and HEAD application-page requests, request-local context, asynchronous native data access, redirects, missing routes, failures, and cancellation. The implemented URL boundary below covers only part of this scope.
+The target scope covers buffered responses for GET and HEAD application-page requests, request-local context, asynchronous native data access, redirects, missing routes, failures, and cancellation. The implemented request boundary below covers only part of this scope.
 
 API request bodies and other methods are handled by explicitly configured host endpoints or rejected by the host's method policy. Streaming responses, WebSockets, binary state transfer, and arbitrary cross-boundary native objects are later work.
 
@@ -49,15 +49,15 @@ AngularAppEngine is a candidate public integration point because its handle meth
 
 ## Contracts and Data
 
-### Implemented URL Boundary
+### Implemented Request Object Boundary
 
-`Renderer::render(request: RenderRequest)` accepts an owned Rust request. The public [RenderRequest](../../crates/rubicon/src/request.rs) currently contains only `url: String`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request.url`; `JavaScriptRuntime::call_string_export` passes it as a V8 string value through `call_with_args`. It does not interpolate the URL into JavaScript source. The module's `render(url)` export returns a string that the host delivers through Axum's `Html` response.
+`Renderer::render(request: RenderRequest)` accepts an owned Rust request. The public [RenderRequest](../../crates/rubicon/src/request.rs) contains `url: String` and `method: String` and derives `serde::Serialize`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request`; the generic `JavaScriptRuntime::call_string_export<T: serde::Serialize>` converts it directly into a V8 object through `serde_v8::to_v8` and invokes the export through `call_with_args`. Values are not interpolated into JavaScript source. The module's `render(request)` export returns a string that the host delivers through Axum's `Html` response.
 
 GET handlers for `/` and `/{*path}` obtain `OriginalUri` and append its original path and query to the fixed application origin `http://127.0.0.1:3000`. The host does not decode or reconstruct query parameters. Source review confirms that request `Host` and forwarded headers are not used to construct this origin; header-spoofing behavior has not been separately exercised. Configurable origins, trusted proxies, and URL size and validation policies remain open.
 
-The demonstration module escapes `&`, `<`, `>`, double quotes, and apostrophes when displaying the URL as HTML text. Every matched GET path currently produces demonstration HTML; this does not implement Angular route matching, application 404 outcomes, or precedence for API and browser-asset paths.
+The handler also extracts the actual HTTP `Method` and stores its string form. The demonstration module escapes `&`, `<`, `>`, double quotes, and apostrophes when displaying either field as HTML text. Every matched GET or HEAD page path invokes the demonstration renderer; this does not implement Angular route matching, application 404 outcomes, or precedence for API and browser-asset paths.
 
-The job currently contains only the URL field of the request model. Method, repeated headers, request identifier, context, native services, and lifecycle controls remain to be added. A string result also does not implement the complete terminal-outcome and response-metadata models below.
+The job currently contains only URL and method from the request model. Repeated headers, request identifier, context, native services, and lifecycle controls remain to be added. A string result also does not implement the complete terminal-outcome and response-metadata models below. Axum omits the HEAD body, but the demonstration's Content-Length is currently based on HTML displaying `HEAD` rather than the corresponding GET representation; RC-05 remains incomplete.
 
 ### Request Model
 
@@ -135,10 +135,11 @@ The benchmark must account for conversion and data-copy costs. Streaming would r
 
 | Requirement | Verification method | Planned evidence | State |
 | --- | --- | --- | --- |
-| RC-01 | Exercise query parameters, direct route access, methods, and repeated headers. | Request conversion checks. | Partial: URL path/query transfer verified; method, headers, and request identifier planned. |
+| RC-01 | Exercise query parameters, direct route access, methods, and repeated headers. | Request conversion checks. | Partial: URL path/query and GET/HEAD method transfer verified; headers and request identifier planned. |
 | RC-02 | Alternate contexts and complete an operation after cancellation. | Request-scope checks. | Planned |
 | RC-03 | Exercise each terminal outcome and attempted late completion. | Outcome checks. | Planned |
-| RC-04, RC-05 | Check status, redirects, Set-Cookie, body content, and HEAD delivery. | HTTP delivery checks. | Partial: successful 200 HTML delivery verified; full response metadata and HEAD comparison planned. |
+| RC-04 | Check status, redirects, Set-Cookie, and body content. | HTTP delivery checks. | Partial: successful 200 HTML delivery verified; application response metadata planned. |
+| RC-05 | Compare GET representation metadata with HEAD delivery. | HTTP delivery checks. | Partial: empty HEAD body verified; demonstration Content-Length mismatch requires correction. |
 | RC-06, RC-07 | Expire or cancel work, then render a new request on recovered capacity. | Cleanup and recovery checks. | Partial: continued execution after ordinary JavaScript and conversion errors verified; cancellation, cleanup, and replacement planned. |
 | RC-08 | Hydrate a page and perform a representative interaction. | Browser check. | Planned |
 | RC-09 | Compare public error responses with internal diagnostics. | Failure reporting review. | Planned |
@@ -149,7 +150,13 @@ On 2026-10-10, the repository formatting check, locked offline compilation check
 
 Two HTTP requests to `/products?sort=asc&page=2` and `/search?q=rust&lang=ro` returned 200 HTML responses containing the corresponding absolute URL with `&amp;` in the HTML source. Consecutive counters were 3 and 4. Commands and observations are recorded in the [architecture URL verification](architecture.md#request-url-http-verification). These checks do not establish Angular compatibility, asynchronous renderer behavior, or performance gains.
 
-The owned request refactor was verified on 2026-10-10 with the repository formatting check, locked offline compilation check for all targets, and full test command. Both library tests and the standalone URL/error integration target passed. The [architecture verification](architecture.md#owned-request-type-verification) records the commands and limits. This introduces a Rust type; the JavaScript boundary and supported request fields remain URL-only.
+The owned request refactor was verified on 2026-10-10 with the repository formatting check, locked offline compilation check for all targets, and full test command. Both library tests and the standalone URL/error integration target passed. The [architecture verification](architecture.md#owned-request-type-verification) records the commands and limits. At that milestone, it introduced a Rust type while JavaScript still received only a URL string.
+
+### Request Object and Method Evidence
+
+Later on 2026-10-10, the same Cargo checks passed with `url` and `method` converted into a JavaScript object. Successful integration calls verified GET/A, HEAD/B, and GET/A, retaining exact field values after the two intentional errors. The standalone executable printed `Renderer request and error checks passed.` Argument-conversion failures are classified in code but were not separately induced.
+
+Actual HTTP checks returned 200 HTML for GET, an empty HEAD response, and a subsequent successful GET. The GET counters were 3 and 5. Their Content-Length was 111; HEAD reported 112 because the demonstration includes the method name in its generated HTML. The [architecture milestone](architecture.md#request-object-and-method-verification) records commands, observations, and the required metadata correction. These checks do not establish complete RC-05 acceptance, request-context isolation, Angular compatibility, or performance gains.
 
 ## Open Questions
 
@@ -170,3 +177,4 @@ The owned request refactor was verified on 2026-10-10 with the repository format
 - [Angular hydration](https://angular.dev/guide/hydration), rolling documentation checked on 2026-10-09.
 - [Angular TransferState](https://angular.dev/api/core/TransferState), rolling documentation checked on 2026-10-09.
 - [Angular SSR guide](https://angular.dev/guide/ssr), request context and transfer-cache documentation checked on 2026-10-09.
+- [RFC 9110 Content-Length semantics](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6), checked on 2026-10-10 for HEAD representation metadata.
