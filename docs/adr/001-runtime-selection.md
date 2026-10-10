@@ -221,3 +221,4 @@ The [compatibility experiment](../experiments/001-angular-runtime-compatibility.
 | 2026-10-10 | Record Angular 22.2.2 on the conventional Node.js server. | Establish a pinned application and verified SSR reference before embedded-runtime compatibility work. |
 | 2026-10-10 | Record routed pages, counter interaction, and Node.js reference hydration. | Establish observable browser behavior to repeat after embedded-runtime integration. |
 | 2026-10-10 | Record neutral bundle loading and missing Web globals. | Verify a public Angular entrypoint direction in a temporary copy while keeping actual embedded SSR and runtime acceptance pending. |
+| 2026-10-10 | Record the author's implemented neutral build entrypoint. | Verify the actual repository build, direct Web handler results in Node.js, and module evaluation in bare deno_core; keep embedded rendering acceptance pending. |

@@ -1,9 +1,9 @@
 # Angular Reference Application
 
-**Status:** Routed SSR and browser hydration reference verified
+**Status:** Node.js SSR/hydration reference and neutral build entrypoint verified
 **Created:** 2026-10-10
 **Last updated:** 2026-10-10
-**Implementation:** Angular SSR and browser hydration on Node.js; Rubicon integration pending
+**Implementation:** Angular SSR/hydration on Node.js and a neutral Web handler build; embedded rendering pending
 
 ## Purpose
 
@@ -40,6 +40,22 @@ During development, `npm.cmd start` runs the separate Angular development server
 The build produces `dist/angular-demo/browser` and `dist/angular-demo/server`. The generated `src/server.ts` uses Express and AngularNodeAppEngine from `@angular/ssr/node`, serves the browser files, and delegates rendering to Angular. Its built entrypoint is `dist/angular-demo/server/server.mjs`.
 
 These files are a reference for inspecting the artifact graph. The Node entrypoint is not an implemented Rubicon adapter and requires APIs beyond the current bare deno_core environment. Rust-hosted rendering and static-asset routing remain future work.
+
+## Neutral Build for Rubicon
+
+The author added `src/server.rubicon.ts` using the public `AngularAppEngine` and `createRequestHandler` APIs. The named `rubicon` build configuration selects that entrypoint with `ssr.platform: "neutral"` and writes a separate `dist/rubicon` directory. The default Node build still uses `src/server.ts` and `dist/angular-demo`.
+
+From this application directory:
+
+```powershell
+npm.cmd run build -- --configuration development,rubicon
+```
+
+Configuration order matters: development settings apply first, then the Rubicon entrypoint and output path. The command passed on 2026-10-10 with zero prerendered routes. The output contains matching browser files and a neutral `server/server.mjs` exporting `reqHandler`. That handler takes a Web `Request` and returns a `Response` or `null` for a route it does not handle. It does not start a listener or serve browser files.
+
+Direct handler verification in Node.js returned HTML responses with status 200, expected page headings, SSR markers, and hydration annotations for Home and About; Home's counter was zero. An unknown route returned `null`. The generated module also loaded and evaluated through Rubicon's unchanged bare deno_core runtime, using the temporary diagnostic retained in the [compatibility record](../../docs/experiments/001-angular-runtime-compatibility.md#repository-entrypoint-verification). That diagnostic did not invoke an Angular render in deno_core.
+
+The runtime still needs compatible Web APIs and an adapter exporting Rubicon's `render` contract. The existing Rust executable continues to use its demonstration module. Browser asset delivery and hydration through Rust remain pending.
 
 ## Host Configuration
 
@@ -81,7 +97,7 @@ The screenshot records the Node.js development build after interaction. Browser 
 
 ## Next Steps
 
-1. Inspect the build's imports and manifests, then define the Angular adapter and required embedded APIs.
+1. Register and verify the embedded Web APIs, then add the adapter from Rubicon's request/response contract to the neutral Web handler.
 2. Render the same application through Rubicon and serve its matching browser assets.
 3. Repeat HTTP, browser hydration, and interaction checks through the Rust host.
 4. Add native data access and lifecycle controls before performance evaluation.

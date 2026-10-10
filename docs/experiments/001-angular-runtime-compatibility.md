@@ -148,6 +148,14 @@ The check establishes initial module loading and evaluation only in deno_core. I
 4. Serve the matching browser assets through the Rust host and repeat the established hydration, interaction, and navigation checks.
 5. Complete service, isolation, and lifecycle checks before the [performance protocol](../specs/benchmark-protocol.md).
 
+## Repository Entrypoint Verification
+
+Later on 2026-10-10, the author applied the documented `server.rubicon.ts` and named `rubicon` configuration to the actual reference application, starting from commit `5574598`. The source matches the temporary prototype described above. A repository build using `npm.cmd run build -- --configuration development,rubicon` passed and generated zero prerendered routes under `examples/angular-demo/dist/rubicon`.
+
+A separate temporary Node.js checker imported this actual `server.mjs` and repeated the three direct handler requests. Home and About returned status 200 and HTML content type, their expected headings, SSR markers, and hydration annotations; Home's counter was zero. The unknown route returned `null`. The checker was removed after validation.
+
+The previously compiled `rubicon-neutral-probe.exe` was then run against the repository's new neutral output. It printed the same global inventory and `MODULE_LOAD_OK`. This reused a temporary executable compiled against the unchanged Rust sources; it is not a retained integration test, and no Angular render was invoked in deno_core. The regular Node output was not rebuilt for this step. The [application README](../../examples/angular-demo/README.md#neutral-build-for-rubicon) now documents the implemented neutral build.
+
 ## Sources
 
 - [Angular non-Node SSR configuration](https://angular.dev/guide/ssr#non-nodejs), checked on 2026-10-10.
