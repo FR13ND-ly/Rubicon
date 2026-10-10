@@ -533,9 +533,17 @@ Repository formatting verification, locked offline compilation for all targets, 
 
 This establishes selected JavaScript stream and abort behavior, not complete Web standards conformance. Rust still transports a buffered String response body; this step does not implement HTTP streaming, host request cancellation, deadlines, or general application resource cleanup. Fetch objects, network operations, embedded Angular request execution, and performance evaluation remain pending.
 
-## Open Questions
+### Web Request and Response Verification
 
-The [Web Request/Response experiment](../experiments/002-web-fetch-objects.md) checked the next proposal in a temporary copy of `8e977c7`: pinned deno_fetch and deno_net extensions, three public object constructors, and a fifth worker fixture. The corrected check passed request URL canonicalization, header normalization, separate cookies, cloned response bodies, split UTF-8 decoding, and repeated body-read rejection. This proposal is not applied to the repository; public fetch, native networking, and Angular handler execution remain pending.
+On 2026-10-10, starting from `80b8073`, the author added deno_fetch 0.283.0 and deno_net 0.251.0, updated Cargo.lock, registered both extensions before the Rubicon bootstrap, and exposed Headers, Request, and Response. Request's internal HTTP client script requires the registered deno_net TLS script. The setup adds nineteen selected public Web globals in total; it does not expose a global fetch function or a Deno namespace.
+
+The fifth integration fixture, `renderer_fetch_objects.mjs`, constructs and clones Web Requests, compares canonical URL representations, checks method and null body, normalizes repeated header values, and preserves two separate Set-Cookie fields including an Expires value containing a comma. It creates a Response with a UTF-8 stream whose final emoji spans two byte chunks, reads both the response and its clone, verifies status/content type/bodyUsed, and requires a second body read to reject with TypeError. The author chose `Response 🦀` as the body text, retaining the split multibyte-character case from the checked proposal.
+
+Repository formatting verification, locked offline compilation for all targets, and the full locked offline test command passed using the commands recorded above. Eight library tests, four executable tests, and all five renderer fixtures passed; one macro-generated documentation example was ignored. LNK4098 persists. The fixture still delegates to the original response/error sequence, and no scheduler, HTTP handler, request type, or response type changed. The [experiment follow-up](../experiments/002-web-fetch-objects.md#repository-verification) records the implementation.
+
+This verifies selected Web objects and their body behavior in the current worker. Request.url is canonicalized while the owned Rust request retains its original URL text. Native networking, public fetch, request body delivery from Axum, host cancellation, Angular handler execution, and performance remain pending. Rust still transports a buffered String response.
+
+## Open Questions
 
 | Question | Impact | Next action |
 | --- | --- | --- |

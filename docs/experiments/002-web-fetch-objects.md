@@ -1,11 +1,11 @@
 # Experiment 002: Web Request and Response Objects
 
-**Status:** Completed temporary check; author implementation pending
+**Status:** Completed temporary check with verified repository implementation
 **Created:** 2026-10-10
 **Last updated:** 2026-10-10
 **Type:** Exploratory correctness check; not a performance benchmark
 **Source revision:** `8e977c7`
-**Implementation scope:** Temporary Rust crate copy; repository implementation remains unchanged
+**Initial implementation scope:** Temporary Rust crate copy; the later repository implementation is recorded below
 
 ## Question and Result
 
@@ -175,13 +175,27 @@ cargo check --manifest-path crates/rubicon/Cargo.toml --all-targets
 cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
 ```
 
-The first check intentionally omits --locked so Cargo can resolve the new dependencies and update the real Cargo.lock. Subsequent checks should use the committed lockfile. Repository verification and an implementation commit are still pending.
+The first check intentionally omits --locked so Cargo can resolve the new dependencies and update the real Cargo.lock. Subsequent checks should use the committed lockfile. These were the proposed author commands; the completed repository verification is recorded below.
+
+## Repository Verification
+
+On 2026-10-10, starting from `80b8073`, the author applied the pinned dependencies, Cargo.lock, extension registration, public bindings, and fifth fixture to the actual crate. The fixture uses `Response 🦀` rather than `Răspuns 🦀`, preserving the final emoji split across two UTF-8 byte chunks and the other checked behavior.
+
+Repository formatting verification, locked offline all-target compilation, and the full locked offline test command passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+Eight library tests, four executable tests, and all five renderer fixtures passed; one macro-generated documentation example was ignored. LNK4098 remains. The [architecture milestone](../specs/architecture.md#web-request-and-response-verification) records the implemented scope. Public fetch, networking, HTTP request-body support, Angular rendering, and performance remain pending.
 
 ## Limits and Next Step
 
 This is selected correctness evidence, not full Fetch standard conformance or a performance result. Native network access, FormData/Blob public methods, request bodies from Axum, abort propagation from HTTP, size limits, and automatic application cleanup were not verified. Rust still receives a buffered String body through its existing response contract.
 
-After author implementation and verification, continue the environment check and add an adapter from the owned Rust request to Angular's Web Request handler. Preserve status, body, and separate cookie fields when converting the Web Response. Actual Angular rendering, matching browser asset delivery, and hydration remain pending.
+With the repository implementation verified, continue the environment check and add an adapter from the owned Rust request to Angular's Web Request handler. Preserve status, body, and separate cookie fields when converting the Web Response. Actual Angular rendering, matching browser asset delivery, and hydration remain pending.
 
 ## Sources
 

@@ -6,7 +6,7 @@ use deno_core::{
 
 deno_core::extension!(
     rubicon_web,
-    deps = [deno_webidl, deno_web],
+    deps = [deno_webidl, deno_web, deno_net, deno_fetch],
     esm_entry_point = "ext:rubicon_web/web.js",
     esm = [dir "js", "web.js"],
 );
@@ -36,6 +36,8 @@ impl JavaScriptRuntime {
                     false,
                     Default::default(),
                 ),
+                deno_net::deno_net::init(None, None),
+                deno_fetch::deno_fetch::init(Default::default()),
                 rubicon_web::init(),
             ],
             ..Default::default()

@@ -11,6 +11,7 @@ async fn main() -> Result<(), String> {
         "renderer_async.mjs",
         "renderer_timers.mjs",
         "renderer_streams.mjs",
+        "renderer_fetch_objects.mjs",
     ] {
         check_renderer_fixture(fixture_name).await?;
     }

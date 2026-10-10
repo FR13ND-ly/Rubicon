@@ -17,6 +17,10 @@ const { ReadableStream, WritableStream, TransformStream } = core.loadExtScript(
   'ext:deno_web/06_streams.js',
 );
 
+const { Headers } = core.loadExtScript('ext:deno_fetch/20_headers.js');
+const { Request } = core.loadExtScript('ext:deno_fetch/23_request.js');
+const { Response } = core.loadExtScript('ext:deno_fetch/23_response.js');
+
 for (const [name, value] of Object.entries({
     URL,
     URLSearchParams,
@@ -34,6 +38,9 @@ for (const [name, value] of Object.entries({
     ReadableStream,
     WritableStream,
     TransformStream,
+    Headers,
+    Request,
+    Response,
 })) {
   Object.defineProperty(globalThis, name, {
     value,
