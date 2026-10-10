@@ -102,7 +102,7 @@ fn run_worker(
             }
 
             let result = runtime
-                .call_string_export(module_id, "render", &job.request)
+                .call_export::<_, String>(module_id, "render", &job.request)
                 .await;
 
             let _ = job.reply.send(result);

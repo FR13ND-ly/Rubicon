@@ -376,6 +376,24 @@ cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-t
 
 These checks establish that the new model and public export compile with all existing targets. The runtime, worker, HTTP handler, and JavaScript fixtures still use the existing string-result flow. No new test or HTTP check was required for this type-only step, and no dependency changed. V8 deserialization, structured worker results, HTTP metadata validation and delivery, and the complete terminal-outcome model remain to be implemented and verified. No performance claim follows from this change. See the [response type definition](rendering-contract.md#defined-response-type).
 
+### Generic Export Verification
+
+Later on 2026-10-10, the author replaced `call_string_export` with `call_export<TArgument, TResult>`. The argument requires `serde::Serialize`; the result requires `serde::de::DeserializeOwned`, so returned data owns its Rust values. Export lookup, argument conversion, and event-loop execution remain in the same helper. Result conversion uses `serde_v8::from_v8::<TResult>` and reports `Result conversion failed:` on failure. The worker selects `call_export::<_, String>` and the existing integration assertion now checks the generic conversion-error prefix.
+
+The following repository checks passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+Two library tests, four executable unit tests, and the standalone worker integration target passed. The latter printed `Renderer request ID and error checks passed.` This preserves exact string results and continued execution after ordinary errors through the worker. Linker warning LNK4098 persists. No dependency changed.
+
+A prior verification of the same proposal in a temporary copy also called `call_export::<_, RenderResponse>` directly. Successful calls 1, 3, and 5 returned status 201, a content-type pair, two separate Set-Cookie pairs, and exact Unicode body text containing identifier `9007199254740993`. Call 2 returned an object where the body string was required and failed conversion; call 4 threw an intentional JavaScript exception. Later successful calls confirmed runtime reuse after both errors. That extra standalone test and its fixture were confined to the temporary copy and are not part of the repository suite.
+
+These checks establish generic result conversion at the runtime boundary. The production worker and HTTP handler still use string results. Structured worker transport, application response metadata, HTTP validity and delivery, asynchronous renderer verification, Angular SSR, lifecycle guarantees, and performance measurement remain future work. No HTTP check was repeated because this step preserves the HTTP string-result path.
+
 ## Open Questions
 
 | Question | Impact | Next action |

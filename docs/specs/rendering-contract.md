@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Request object and demonstration HEAD metadata verified; RenderResponse type defined but not connected; Angular adapter not implemented
+**Implementation:** Request object verified; generic runtime result conversion implemented; structured response not connected to HTTP; Angular adapter not implemented
 
 ## Purpose and Context
 
@@ -51,7 +51,7 @@ AngularAppEngine is a candidate public integration point because its handle meth
 
 ### Implemented Request Object Boundary
 
-`Renderer::render(request: RenderRequest)` accepts an owned Rust request. The public [RenderRequest](../../crates/rubicon/src/request.rs) contains `request_id: String`, `url: String`, `method: String`, and `headers: Vec<(String, String)>` and derives `serde::Serialize`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request`; the generic `JavaScriptRuntime::call_string_export<T: serde::Serialize>` converts it directly into a V8 object through `serde_v8::to_v8` and invokes the export through `call_with_args`. The identifier becomes a JavaScript string and header pairs become JavaScript arrays. Values are not interpolated into JavaScript source. The module's `render(request)` export returns a string that the host delivers through Axum's `Html` response.
+`Renderer::render(request: RenderRequest)` accepts an owned Rust request. The public [RenderRequest](../../crates/rubicon/src/request.rs) contains `request_id: String`, `url: String`, `method: String`, and `headers: Vec<(String, String)>` and derives `serde::Serialize`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request`; the generic `JavaScriptRuntime::call_export<TArgument, TResult>` converts it directly into a V8 object through `serde_v8::to_v8` and invokes the export through `call_with_args`. The argument requires `serde::Serialize`, while the result requires `serde::de::DeserializeOwned` and is converted through `serde_v8::from_v8::<TResult>`. The worker currently selects `String` as the result type. The identifier becomes a JavaScript string and header pairs become JavaScript arrays. Values are not interpolated into JavaScript source. The module's `render(request)` export returns a string that the host delivers through Axum's `Html` response.
 
 GET handlers for `/` and `/{*path}` obtain `OriginalUri` and append its original path and query to the fixed application origin `http://127.0.0.1:3000`. The host does not decode or reconstruct query parameters. Source review confirms that request `Host` and forwarded headers are not used to construct this origin; header-spoofing behavior has not been separately exercised. Configurable origins, trusted proxies, and URL size and validation policies remain open.
 
@@ -86,7 +86,7 @@ The library exposes [RenderResponse](../../crates/rubicon/src/response.rs) throu
 | `headers` | `Vec<(String, String)>` | Response name-value pairs, capable of representing repeated fields such as Set-Cookie. |
 | `body` | `String` | Buffered UTF-8 response content. |
 
-At this milestone, only the data type and public export are implemented. `Deserialize` enables a later conversion into the type; a JavaScript-to-Rust response conversion has not yet been exercised. The worker still transports a string, and the HTTP handler still delivers it through `Html`. Header validation, transport-owned header policy, repeated-field delivery, application status delivery, redirects, and body restrictions remain future work. Defining the type does not establish RC-03 or RC-04 acceptance. No dependency was added.
+The data type, public export, and generic runtime result conversion are implemented. Calling `call_export::<_, RenderResponse>` selects this structure instead of a string. A prior proposal check in a temporary copy verified status 201, two separate Set-Cookie pairs, Unicode body content, an exact large request identifier, and successful calls after conversion and JavaScript errors. The additional test and fixture remained in that temporary copy. The repository suite continues to exercise `String` through the worker, which still transports a string; the HTTP handler still delivers it through `Html`. Result conversion failures use the prefix `Result conversion failed:`. These checks establish data conversion, not HTTP status or header validity. Header validation, transport-owned header policy, repeated-field delivery, application status delivery, redirects, and body restrictions remain future work. The complete RC-03 and RC-04 outcomes are not implemented. No dependency was added. See the [generic export verification](architecture.md#generic-export-verification).
 
 ### Terminal Outcomes
 

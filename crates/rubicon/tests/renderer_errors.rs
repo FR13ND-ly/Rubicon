@@ -44,7 +44,7 @@ async fn main() -> Result<(), String> {
 
     match render(&renderer, "test-4", "HEAD", first_url).await {
         Err(RenderError::Failed(message)) => {
-            assert!(message.starts_with("String conversion failed:"));
+            assert!(message.starts_with("Result conversion failed:"));
         }
         other => panic!("Expected a string conversion error, got {other:?}"),
     }

@@ -69,12 +69,16 @@ impl JavaScriptRuntime {
         Ok(module_id)
     }
 
-    pub async fn call_string_export<T: serde::Serialize>(
+    pub async fn call_export<TArgument, TResult>(
         &mut self,
         module_id: ModuleId,
         export_name: &str,
-        argument: &T,
-    ) -> Result<String, String> {
+        argument: &TArgument,
+    ) -> Result<TResult, String>
+    where
+        TArgument: serde::Serialize,
+        TResult: serde::de::DeserializeOwned,
+    {
         let namespace = self
             .inner
             .get_module_namespace(module_id)
@@ -115,8 +119,8 @@ impl JavaScriptRuntime {
         deno_core::scope!(scope, &mut self.inner);
         let local = v8::Local::new(scope, result);
 
-        serde_v8::from_v8::<String>(scope, local)
-            .map_err(|error| format!("String conversion failed: {error}"))
+        serde_v8::from_v8::<TResult>(scope, local)
+            .map_err(|error| format!("Result conversion failed: {error}"))
     }
 }
 
