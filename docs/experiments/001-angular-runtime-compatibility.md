@@ -5,7 +5,7 @@
 **Last updated:** 2026-10-10
 **Type:** Exploratory correctness check; not a performance benchmark
 **Source revision:** `96f66452a5a585557885d27a9f7f27b77cf50a21`
-**Implementation scope:** Temporary Angular entrypoint and configuration; no application or framework source changes committed
+**Initial implementation scope:** Temporary Angular entrypoint and configuration; repository implementation and later prototypes are recorded separately below
 
 ## Question and Result
 
@@ -156,11 +156,40 @@ A separate temporary Node.js checker imported this actual `server.mjs` and repea
 
 The previously compiled `rubicon-neutral-probe.exe` was then run against the repository's new neutral output. It printed the same global inventory and `MODULE_LOAD_OK`. This reused a temporary executable compiled against the unchanged Rust sources; it is not a retained integration test, and no Angular render was invoked in deno_core. The regular Node output was not rebuilt for this step. The [application README](../../examples/angular-demo/README.md#neutral-build-for-rubicon) now documents the implemented neutral build.
 
+## Web Foundation Prototype
+
+After the neutral entrypoint was committed as `36e25f6`, a separate temporary copy of `crates/rubicon` tested the first runtime Web APIs. The project's Rust implementation remained unchanged. The copy added exact dependencies `deno_web = "=0.290.0"` and `deno_webidl = "=0.259.0"`, both compatible with deno_core 0.412.0 according to their downloaded crate manifests. The current deno_url crate is deprecated and points to deno_web; no deno_url dependency was added.
+
+The runtime extension order was deno_webidl, deno_web, then a small Rubicon bootstrap extension. deno_web initialized a per-runtime BlobStore, no location, disabled optional CSS parser features, and the default broadcast channel. The bootstrap used `core.loadExtScript` to obtain URL/URLSearchParams from `ext:deno_web/00_url.js` and TextEncoder/TextDecoder from `ext:deno_web/08_text_encoding.js`, then defined those four globals as writable, configurable properties. These imports and initialization calls were checked against the pinned crate sources and executed in the prototype.
+
+Two new runtime tests covered relative URL resolution, percent-decoded query values, repeated parameters, a Unicode query round trip, a UTF-8 byte round trip with Romanian characters and an emoji, and rejection of invalid UTF-8 in fatal decoding mode. The existing execution/conversion recovery test remained in the test set.
+
+The first synchronous test run terminated with Windows status `0xc0000409`. A sequential run with captured output disabled exposed this V8 diagnostic:
+
+```text
+V8 posted a delayed task, but this isolate was created outside of a tokio runtime context and the delay cannot be honored. Enter a tokio runtime (e.g. via `tokio::runtime::Runtime::enter()`) before creating the `JsRuntime`.
+```
+
+The corrected prototype ran all three JavaScriptRuntime tests as `#[tokio::test(flavor = "current_thread")] async fn ...`, without changing their synchronous JavaScript operations. The actual worker already creates its runtime inside a current-thread Tokio executor. Future constructor callers must likewise create the isolate with an active Tokio context; a synchronous constructor signature does not remove that requirement. Test serialization alone did not resolve the failure.
+
+The corrected temporary package retained the library name `rubicon` but used package name `rubicon-web-probe`, avoiding replacement of the author's normal application executable. It reused the ignored target directory. Validation passed with these commands, where `<copy>` is the temporary crate:
+
+```text
+cargo fmt --manifest-path <copy>/Cargo.toml
+cargo check --offline --manifest-path <copy>/Cargo.toml --all-targets --target-dir C:/Users/motri/Desktop/rubicon/crates/rubicon/target
+cargo test --locked --offline --manifest-path <copy>/Cargo.toml --target-dir C:/Users/motri/Desktop/rubicon/crates/rubicon/target
+```
+
+The all-target check passed. Eight library tests and four executable tests passed; both synchronous and asynchronous renderer fixtures passed. One macro-generated documentation example was ignored. The corrected tests used the default test harness concurrency, rather than relying on `--test-threads=1`. LNK4098 remained present. The temporary crate was removed; the latest full local output is in ignored `crates/rubicon/target/web-foundation-probe.log`. Its copied lockfile was updated for the new dependencies; the project's Cargo.lock was not modified.
+
+This verifies a proposed setup for four Web globals and the required test context. The author still needs to apply these Rust and JavaScript changes to the actual crate. It does not provide Request/Response/Headers, streams, abort support, public timers, performance, fetch, or Angular rendering. Those capabilities remain separate steps.
+
 ## Sources
 
 - [Angular non-Node SSR configuration](https://angular.dev/guide/ssr#non-nodejs), checked on 2026-10-10.
 - [AngularAppEngine](https://angular.dev/api/ssr/AngularAppEngine), checked on 2026-10-10.
 - [createRequestHandler](https://angular.dev/api/ssr/createRequestHandler), checked on 2026-10-10.
+- [deno_web](https://docs.rs/crate/deno_web/latest) and [deno_webidl](https://docs.rs/crate/deno_webidl/latest), rolling crate pages checked on 2026-10-10; prototype versions pinned to 0.290.0 and 0.259.0 and verified from downloaded manifests and source.
 - Installed Angular 22.2.2 builder schema and esbuild source, and `@angular/ssr/fesm2022/ssr.mjs`, resolved by the example's package-lock.json at the source revision.
 
 Rolling documentation explains the supported API direction. The observed compatibility result is limited to the pinned dependencies and generated artifacts tested here.

@@ -499,6 +499,8 @@ This implements the build entrypoint only. Rubicon's executable still loads its 
 
 ## Open Questions
 
+An additional [temporary Web foundation check](../experiments/001-angular-runtime-compatibility.md#web-foundation-prototype) verified deno_web 0.290.0 and deno_webidl 0.259.0 registration and four exposed globals: URL, URLSearchParams, TextEncoder, and TextDecoder. URL/UTF-8 tests and the existing regression suite passed after JavaScriptRuntime unit tests were moved into current-thread Tokio contexts in the temporary copy. This is a checked proposal for the author's next Rust step, not an implemented runtime capability in the repository.
+
 | Question | Impact | Next action |
 | --- | --- | --- |
 | Which generated Angular entrypoint and manifests are required? | Defines the artifact-loading integration. | Use the implemented neutral build and verify lazy bootstrap and asset imports during embedded rendering. |
