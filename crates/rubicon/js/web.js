@@ -20,6 +20,10 @@ const { ReadableStream, WritableStream, TransformStream } = core.loadExtScript(
 const { Headers } = core.loadExtScript('ext:deno_fetch/20_headers.js');
 const { Request } = core.loadExtScript('ext:deno_fetch/23_request.js');
 const { Response } = core.loadExtScript('ext:deno_fetch/23_response.js');
+const { performance, setTimeOrigin } = core.loadExtScript(
+  'ext:deno_web/15_performance.js',
+);
+setTimeOrigin();
 
 for (const [name, value] of Object.entries({
     URL,
@@ -41,6 +45,7 @@ for (const [name, value] of Object.entries({
     Headers,
     Request,
     Response,
+    performance,
 })) {
   Object.defineProperty(globalThis, name, {
     value,

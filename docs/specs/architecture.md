@@ -543,9 +543,15 @@ Repository formatting verification, locked offline compilation for all targets, 
 
 This verifies selected Web objects and their body behavior in the current worker. Request.url is canonicalized while the owned Rust request retains its original URL text. Native networking, public fetch, request body delivery from Axum, host cancellation, Angular handler execution, and performance remain pending. Rust still transports a buffered String response.
 
+### Performance API Verification
+
+On 2026-10-11, starting from `436efd1`, the author loaded Deno's performance implementation through the bootstrap, called setTimeOrigin, and exposed performance as the twentieth selected public Web global. The sixth worker fixture checks clock initialization, nondecreasing readings across a timer, marks carrying request detail, a nonnegative measure, and explicit removal of its named entries. It then delegates to the existing structured response/error recovery sequence.
+
+Repository formatting verification, locked offline compilation for all targets, and the full test suite passed. Eight library tests, four executable tests, and all six fixtures passed; one macro-generated documentation example was ignored. LNK4098 persists. The [experiment follow-up](../experiments/003-performance-angular-render.md#repository-performance-verification) records the commands and outcomes. This supplies runtime infrastructure required by Angular; it is not a performance result or evidence of automatic application cleanup.
+
 ## Open Questions
 
-The [performance/Angular experiment](../experiments/003-performance-angular-render.md) verified the next bootstrap proposal in a temporary copy of `49709a9`. Angular's first lazy application import required the missing performance global. Initializing Deno's performance object enabled five sequential worker calls: Home, About, a mapped unknown route, repeated Home, and a HEAD representation, all accepted by the existing response converter. Eight library tests, four executable tests, and six fixtures passed in the copy. The repository still lacks this bootstrap addition and adapter; HTTP delivery of Angular, browser assets, hydration, and lifecycle acceptance remain pending.
+The [performance/Angular experiment](../experiments/003-performance-angular-render.md) verified Angular rendering in a temporary copy of `49709a9`. Angular's first lazy application import required the missing performance global. Initializing Deno's performance object enabled five sequential worker calls: Home, About, a mapped unknown route, repeated Home, and a HEAD representation, all accepted by the existing response converter. Eight library tests, four executable tests, and six fixtures passed in the copy. The performance bootstrap and fixture are now verified in the repository. The Angular adapter, HTTP delivery of Angular, browser assets, hydration, and lifecycle acceptance remain pending.
 
 | Question | Impact | Next action |
 | --- | --- | --- |

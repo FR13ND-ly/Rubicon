@@ -1,11 +1,11 @@
 # Experiment 003: Performance API and First Embedded Angular Render
 
-**Status:** Completed temporary check; author implementation pending
+**Status:** Completed temporary check; repository performance API verified; Angular adapter pending
 **Created:** 2026-10-11
 **Last updated:** 2026-10-11
 **Type:** Exploratory correctness check; not a performance benchmark
 **Source revision:** `49709a9`
-**Implementation scope:** Temporary Rust crate and neutral build copies; repository implementation remains unchanged
+**Implementation scope:** Temporary Angular rendering diagnostic; performance bootstrap and sixth fixture subsequently implemented in the repository
 
 ## Question and Result
 
@@ -13,7 +13,7 @@ Can the current persistent Rust worker render the pinned Angular application's n
 
 Yes, for the five calls checked below. The current runtime initially failed the first GET with `ReferenceError: performance is not defined` during lazy application-module initialization. A temporary bootstrap addition exposing Deno's real performance object and initializing timeOrigin enabled Home and About SSR, a controlled 404 fallback, repeated Home rendering, and a HEAD representation. Each response also passed Rubicon's existing HTTP response conversion helper.
 
-The Angular 22.2.2 development artifact was built earlier using the normal Angular CLI. The rendering calls here executed in the Rust worker and embedded V8; no HTTP server was started by the diagnostic. The actual repository executable still loads its demonstration module. This proposal has not been applied by the author.
+The Angular 22.2.2 development artifact was built earlier using the normal Angular CLI. The rendering calls here executed in the Rust worker and embedded V8; no HTTP server was started by the diagnostic. The author subsequently implemented the performance bootstrap and fixture, as recorded below. The actual repository executable still loads its demonstration module; the Angular adapter remains pending.
 
 This establishes initial embedded rendering correctness. Browser asset serving, hydration through Rubicon, native networking, isolation, lifecycle acceptance, and performance measurement remain pending.
 
@@ -247,17 +247,23 @@ Reusing a previously compiled temporary package after its source directory had b
 
 When repeating this experiment, keep the current copy alive through execution and ensure its library is compiled for that copy, for example with a fresh temporary package identity. A sandboxed rerun also emitted incremental-cache hard-link warnings and used copying as a fallback. Deployable extension and application packaging remain separate work.
 
-## Author's Next Step
+## Repository Performance Verification
 
-Apply only the performance bootstrap addition and sixth fixture first, then run:
+On 2026-10-11, starting from `436efd1`, the author applied the performance bootstrap addition and added renderer_performance.mjs as the sixth integration fixture. No dependency version, runtime scheduler, HTTP handler, or request/response type changed. The bootstrap now exposes twenty selected public Web globals.
+
+Repository formatting verification, locked offline compilation for all targets, and the full test suite passed:
 
 ```text
-cargo fmt --manifest-path crates/rubicon/Cargo.toml
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
 cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
 cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
 ```
 
-After repository verification and its implementation commit, add the Angular render adapter, rebuild the neutral application, select the generated module in the Rust executable, and verify actual HTTP page responses. Then serve the matching browser assets and repeat the established browser hydration and counter checks.
+Eight library tests, four executable tests, and all six integration fixtures passed. One macro-generated documentation example was ignored. LNK4098 persists. The fixture checks finite clock values, positive timeOrigin, nondecreasing readings, marks with request detail, a nonnegative measure, and removal of its own named entries before the controlled response/error sequence. It uses no timing threshold and does not measure throughput or latency.
+
+## Author's Next Step
+
+The performance bootstrap and sixth fixture are verified in the repository. Next add the Angular render adapter, rebuild the neutral application, select the generated module in the Rust executable, and verify actual HTTP page responses. Then serve the matching browser assets and repeat the established browser hydration and counter checks.
 
 ## Limits
 

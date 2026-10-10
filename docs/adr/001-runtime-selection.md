@@ -1,7 +1,7 @@
 # ADR 001: JavaScript Runtime Selection
 
 **Date:** 2026-10-09
-**Last updated:** 2026-10-10
+**Last updated:** 2026-10-11
 **Status:** Draft
 **Decision scope:** Prototype
 
@@ -226,3 +226,4 @@ The [compatibility experiment](../experiments/001-angular-runtime-compatibility.
 | 2026-10-10 | Record implemented Web timers. | Verify actual callback fulfillment and explicit timer cancellation through the existing worker, preserving response/error recovery; request cancellation, general cleanup, and Angular rendering remain pending. |
 | 2026-10-10 | Record implemented streams and abort interfaces. | Verify Unicode pipeline content and closure, propagation of cancellation, and continued response/error recovery; keep HTTP streaming, host request cancellation, and Angular rendering acceptance pending. |
 | 2026-10-10 | Record implemented Web Request and Response objects. | Verify canonical URLs, separate cookies, cloned stream bodies, and consumption errors with pinned deno_fetch/deno_net extensions; keep native networking, Angular handler execution, and runtime acceptance pending. |
+| 2026-10-11 | Record implemented performance API and temporary Angular rendering. | Verify initialized clock, marks/measures and explicit fixture cleanup; the temporary worker rendered Home/About, mapped an unknown route, and returned a HEAD representation. Repository Angular HTTP integration, hydration, lifecycle acceptance, and benchmarks remain pending. |
