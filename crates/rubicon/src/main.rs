@@ -7,7 +7,7 @@ use axum::{
     response::Html,
     routing::get,
 };
-use rubicon::{RenderError, Renderer};
+use rubicon::{RenderError, RenderRequest, Renderer};
 
 const APPLICATION_ORIGIN: &str = "http://127.0.0.1:3000";
 
@@ -47,8 +47,9 @@ async fn root(
         .unwrap_or("/");
 
     let url = format!("{APPLICATION_ORIGIN}{path_and_query}");
+    let request = RenderRequest { url };
 
-    match renderer.render(url).await {
+    match renderer.render(request).await {
         Ok(html) => Ok(Html(html)),
 
         Err(RenderError::Busy) => Err((StatusCode::SERVICE_UNAVAILABLE, "Server busy. Try again.")),

@@ -1,6 +1,6 @@
 use std::{path::Path, time::Duration};
 
-use rubicon::{RenderError, Renderer};
+use rubicon::{RenderError, RenderRequest, Renderer};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), String> {
@@ -64,7 +64,11 @@ async fn main() -> Result<(), String> {
 }
 
 async fn render(renderer: &Renderer, url: &str) -> Result<String, RenderError> {
-    tokio::time::timeout(Duration::from_secs(5), renderer.render(url.to_owned()))
+    let request = RenderRequest {
+        url: url.to_owned(),
+    };
+
+    tokio::time::timeout(Duration::from_secs(5), renderer.render(request))
         .await
         .expect("Rendering exceeded the test time limit")
 }

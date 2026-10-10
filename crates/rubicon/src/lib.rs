@@ -4,8 +4,10 @@ use deno_core::{
     FsModuleLoader, JsRuntime, ModuleId, ModuleSpecifier, RuntimeOptions, serde_v8, v8,
 };
 mod renderer;
+mod request;
 
 pub use renderer::{RenderError, Renderer};
+pub use request::RenderRequest;
 
 pub struct JavaScriptRuntime {
     inner: JsRuntime,

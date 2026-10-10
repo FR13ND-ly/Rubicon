@@ -2,12 +2,12 @@ use std::{path::PathBuf, thread};
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::JavaScriptRuntime;
+use crate::{JavaScriptRuntime, RenderRequest};
 
 const QUEUE_CAPACITY: usize = 16;
 
 struct RenderJob {
-    url: String,
+    request: RenderRequest,
     reply: oneshot::Sender<Result<String, String>>,
 }
 
@@ -42,11 +42,11 @@ impl Renderer {
         Ok(Self { sender })
     }
 
-    pub async fn render(&self, url: String) -> Result<String, RenderError> {
+    pub async fn render(&self, request: RenderRequest) -> Result<String, RenderError> {
         let (reply, response) = oneshot::channel();
 
         self.sender
-            .try_send(RenderJob { url, reply })
+            .try_send(RenderJob { request, reply })
             .map_err(|error| match error {
                 mpsc::error::TrySendError::Full(_) => RenderError::Busy,
                 mpsc::error::TrySendError::Closed(_) => RenderError::Unavailable,
@@ -102,7 +102,7 @@ fn run_worker(
             }
 
             let result = runtime
-                .call_string_export(module_id, "render", &job.url)
+                .call_string_export(module_id, "render", &job.request.url)
                 .await;
 
             let _ = job.reply.send(result);
@@ -115,6 +115,7 @@ mod tests {
     use std::time::Duration;
 
     use super::{QUEUE_CAPACITY, RenderError, RenderJob, Renderer};
+    use crate::RenderRequest;
     use tokio::sync::{mpsc, oneshot};
 
     #[tokio::test]
@@ -124,16 +125,25 @@ mod tests {
         let mut pending_replies = Vec::new();
 
         for _ in 0..QUEUE_CAPACITY {
-            let url = "http://127.0.0.1:3000/test".to_owned();
+            let request = RenderRequest {
+                url: "http://127.0.0.1:3000/test".to_owned(),
+            };
             let (reply, response) = oneshot::channel();
 
-            assert!(renderer.sender.try_send(RenderJob { url, reply }).is_ok());
+            assert!(
+                renderer
+                    .sender
+                    .try_send(RenderJob { request, reply })
+                    .is_ok()
+            );
             pending_replies.push(response);
         }
 
         let result = tokio::time::timeout(
             Duration::from_secs(2),
-            renderer.render("http://127.0.0.1:3000/test".to_owned()),
+            renderer.render(RenderRequest {
+                url: "http://127.0.0.1:3000/test".to_owned(),
+            }),
         )
         .await
         .expect("A full queue must reject the request without waiting for capacity");

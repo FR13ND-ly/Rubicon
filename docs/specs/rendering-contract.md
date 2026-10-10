@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Partial URL-only prototype; Angular adapter not implemented
+**Implementation:** Partial URL-only prototype with owned Rust request type; Angular adapter not implemented
 
 ## Purpose and Context
 
@@ -51,7 +51,7 @@ AngularAppEngine is a candidate public integration point because its handle meth
 
 ### Implemented URL Boundary
 
-`Renderer::render(url: String)` accepts an owned URL. Each `RenderJob` carries that URL and its own reply channel to the persistent worker. `JavaScriptRuntime::call_string_export` passes the argument as a V8 string value through `call_with_args`; it does not interpolate the URL into JavaScript source. The module's `render(url)` export returns a string that the host delivers through Axum's `Html` response.
+`Renderer::render(request: RenderRequest)` accepts an owned Rust request. The public [RenderRequest](../../crates/rubicon/src/request.rs) currently contains only `url: String`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request.url`; `JavaScriptRuntime::call_string_export` passes it as a V8 string value through `call_with_args`. It does not interpolate the URL into JavaScript source. The module's `render(url)` export returns a string that the host delivers through Axum's `Html` response.
 
 GET handlers for `/` and `/{*path}` obtain `OriginalUri` and append its original path and query to the fixed application origin `http://127.0.0.1:3000`. The host does not decode or reconstruct query parameters. Source review confirms that request `Host` and forwarded headers are not used to construct this origin; header-spoofing behavior has not been separately exercised. Configurable origins, trusted proxies, and URL size and validation policies remain open.
 
@@ -148,6 +148,8 @@ The benchmark must account for conversion and data-copy costs. Streaming would r
 On 2026-10-10, the repository formatting check, locked offline compilation check for all targets, and full test command passed. The worker integration target alternates two URLs across successful calls 1, 3, and 5, with a JavaScript exception on call 2 and a string-conversion failure on call 4. It checks the exact echoed URL, including query separators and literal apostrophes, after each ordinary failure. This verifies argument association and continued execution; it does not verify isolation of user contexts or recovery from fatal engine failures.
 
 Two HTTP requests to `/products?sort=asc&page=2` and `/search?q=rust&lang=ro` returned 200 HTML responses containing the corresponding absolute URL with `&amp;` in the HTML source. Consecutive counters were 3 and 4. Commands and observations are recorded in the [architecture URL verification](architecture.md#request-url-http-verification). These checks do not establish Angular compatibility, asynchronous renderer behavior, or performance gains.
+
+The owned request refactor was verified on 2026-10-10 with the repository formatting check, locked offline compilation check for all targets, and full test command. Both library tests and the standalone URL/error integration target passed. The [architecture verification](architecture.md#owned-request-type-verification) records the commands and limits. This introduces a Rust type; the JavaScript boundary and supported request fields remain URL-only.
 
 ## Open Questions
 

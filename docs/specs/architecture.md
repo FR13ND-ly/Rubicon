@@ -38,7 +38,7 @@ The current executable initializes the V8 platform on the main thread and starts
 
 Startup waits for a one-shot module-initialization result before binding the HTTP listener. This confirms runtime creation and module evaluation; the `render` export is checked when invoked, so this handshake does not establish full application rendering readiness.
 
-Axum stores a cloneable `Renderer` in application state. GET handlers for `/` and `/{*path}` extract `OriginalUri`, combine its path and query with the fixed origin `http://127.0.0.1:3000`, and submit the resulting URL through a bounded Tokio `mpsc` channel. Each handler waits for its job's `oneshot` reply. The worker passes the URL as a V8 string value to the module's `render(url)` export, converts the result to a Rust string, and returns it to the handler as buffered HTML.
+Axum stores a cloneable `Renderer` in application state. GET handlers for `/` and `/{*path}` extract `OriginalUri`, combine its path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest { url }`. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request.url`, passes it as a V8 string value to the module's `render(url)` export, converts the result to a Rust string, and returns it to the handler as buffered HTML.
 
 The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one job at a time. Submission uses `try_send`, so a full queue is rejected immediately rather than creating additional tasks waiting to enqueue. This bounds queued render jobs, not all HTTP connections or total process memory. The value is provisional and has not been tuned by benchmarks.
 
@@ -246,6 +246,22 @@ Both requests to the author's already-running server returned `200 OK` and `Cont
 ```
 
 This verifies the request URL's passage through the HTTP handler, worker queue, V8 argument, and HTML result. The counter remains a module-persistence diagnostic. Methods, repeated headers, request identifiers, complete response outcomes, Angular rendering, user-data isolation, asynchronous JavaScript rendering, and lifecycle controls remain unverified or unimplemented. These are correctness checks and do not establish performance gains.
+
+### Owned Request Type Verification
+
+On 2026-10-10, the author added `src/request.rs` with a public `RenderRequest` containing `url: String`, re-exported it from the library, and changed `Renderer::render` to accept that owned type. The executable, queue test, and integration helper now construct the request explicitly. Ownership moves into the queued job; the worker borrows its URL for the existing runtime call. No new dependency was introduced.
+
+The following repository checks passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+The library reported two tests passed and zero failed, and the standalone integration executable printed `Renderer URL and error checks passed.` Binary and documentation test harnesses contained zero tests. The existing fixture still verifies exact URL association across successful calls and continued worker execution after ordinary errors. Linker warning LNK4098 persists.
+
+This refactor introduces a Rust request type without extending the implemented request semantics. JavaScript still receives a URL string. Method, headers, request identifier, context, and lifecycle fields remain future work. HTTP requests were not repeated for this refactor, and these checks do not establish performance improvements or full rendering-contract acceptance.
 
 ## Open Questions
 

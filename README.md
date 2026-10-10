@@ -12,7 +12,7 @@ Run the local server with:
 cargo run --locked --manifest-path crates/rubicon/Cargo.toml
 ```
 
-The library's `JavaScriptRuntime` owns one embedded runtime, evaluates synchronous scripts through `execute_i64`, loads a main module, and calls string-returning exports with a string argument. The public [Renderer](crates/rubicon/src/renderer.rs) accepts an owned URL string and sends it with each job to a dedicated thread that owns the runtime and loads the module once. Its fixed queue holds up to 16 waiting jobs, with one render active at a time. Cloning `Renderer` shares access to this worker.
+The library's `JavaScriptRuntime` owns one embedded runtime, evaluates synchronous scripts through `execute_i64`, loads a main module, and calls string-returning exports with a string argument. The public [Renderer](crates/rubicon/src/renderer.rs) accepts an owned [RenderRequest](crates/rubicon/src/request.rs), currently containing only `url: String`, and sends it with each job to a dedicated thread that owns the runtime and loads the module once. The worker borrows this field for the JavaScript call. Its fixed queue holds up to 16 waiting jobs, with one render active at a time. Cloning `Renderer` shares access to this worker.
 
 The HTTP handler combines the fixed application origin `http://127.0.0.1:3000` with the original request path and query. It passes the result to JavaScript as a V8 string value. The demonstration module displays that URL with HTML text escaping and a counter increasing on every render. For example, `/products?sort=asc&page=2` displays `URL: http://127.0.0.1:3000/products?sort=asc&amp;page=2` in the HTML source. The counter verifies module reuse; it is not an example of storing user data.
 
