@@ -394,6 +394,22 @@ A prior verification of the same proposal in a temporary copy also called `call_
 
 These checks establish generic result conversion at the runtime boundary. The production worker and HTTP handler still use string results. Structured worker transport, application response metadata, HTTP validity and delivery, asynchronous renderer verification, Angular SSR, lifecycle guarantees, and performance measurement remain future work. No HTTP check was repeated because this step preserves the HTTP string-result path.
 
+### HTTP Response Conversion Verification
+
+Later on 2026-10-10, the author added `src/http_response.rs` and publicly exported `into_http_response`. The function maps the engine-independent `RenderResponse` into an Axum response, accepting final statuses 200 through 599, enforcing empty bodies for 204, 205, and 304, validating header syntax, and rejecting renderer-supplied transport headers. Repeated application fields use `HeaderMap::append`, and the buffered string body becomes an Axum `Body`. No default Content-Type or explicit Content-Length is inserted by the helper.
+
+The following repository checks passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+Six library tests, four executable unit tests, and the standalone worker integration target passed. The four new conversion tests preserve a 302 response, Location, two distinct Set-Cookie values in order, and exact UTF-8 body bytes. Rejection cases include invalid and informational status numbers, an invalid header name, an embedded CRLF value, and mixed-case Content-Length, Transfer-Encoding, and Connection names. The status-body test rejects nonempty bodies for 204, 205, and 304 and accepts empty bodies for those statuses. Linker warning LNK4098 persists. No dependency changed.
+
+The conversion helper is not yet invoked by the live handler. Worker channels and the demonstration export still use string results; application metadata delivery, HEAD transport behavior through this helper, and invalid-response HTTP error mapping remain to be verified after connecting them. No network check was repeated for this helper-only step. The response model and conversion contain no engine handles, but the existing runtime initialization and module API still depend on deno_core. Full runtime-adapter separation, Angular compatibility, lifecycle controls, and performance measurement remain future work. The [rendering contract](rendering-contract.md#implemented-http-response-conversion) records the current policy and limitations.
+
 ## Open Questions
 
 | Question | Impact | Next action |

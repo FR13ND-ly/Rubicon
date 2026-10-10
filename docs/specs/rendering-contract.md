@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Request object verified; generic runtime result conversion implemented; structured response not connected to HTTP; Angular adapter not implemented
+**Implementation:** Request object and generic result conversion implemented; HTTP response conversion unit-tested but not connected to the handler; Angular adapter not implemented
 
 ## Purpose and Context
 
@@ -82,11 +82,21 @@ The library exposes [RenderResponse](../../crates/rubicon/src/response.rs) throu
 
 | Field | Rust type | Intended meaning |
 | --- | --- | --- |
-| `status` | `u16` | Final HTTP status; valid status and body rules still require host validation. |
+| `status` | `u16` | Final HTTP status; the conversion helper accepts 200 through 599 and checks selected body rules. Its use by the HTTP handler remains pending. |
 | `headers` | `Vec<(String, String)>` | Response name-value pairs, capable of representing repeated fields such as Set-Cookie. |
 | `body` | `String` | Buffered UTF-8 response content. |
 
-The data type, public export, and generic runtime result conversion are implemented. Calling `call_export::<_, RenderResponse>` selects this structure instead of a string. A prior proposal check in a temporary copy verified status 201, two separate Set-Cookie pairs, Unicode body content, an exact large request identifier, and successful calls after conversion and JavaScript errors. The additional test and fixture remained in that temporary copy. The repository suite continues to exercise `String` through the worker, which still transports a string; the HTTP handler still delivers it through `Html`. Result conversion failures use the prefix `Result conversion failed:`. These checks establish data conversion, not HTTP status or header validity. Header validation, transport-owned header policy, repeated-field delivery, application status delivery, redirects, and body restrictions remain future work. The complete RC-03 and RC-04 outcomes are not implemented. No dependency was added. See the [generic export verification](architecture.md#generic-export-verification).
+The data type, public export, and generic runtime result conversion are implemented. Calling `call_export::<_, RenderResponse>` selects this structure instead of a string. A prior proposal check in a temporary copy verified status 201, two separate Set-Cookie pairs, Unicode body content, an exact large request identifier, and successful calls after conversion and JavaScript errors. The additional test and fixture remained in that temporary copy. The repository suite continues to exercise `String` through the worker, which still transports a string; the HTTP handler still delivers it through `Html`. Result conversion failures use the prefix `Result conversion failed:`. The HTTP conversion helper below is now implemented and unit-tested, but its connection to the worker and handler remains pending. The complete RC-03 and RC-04 outcomes are not implemented. No dependency was added. See the [generic export verification](architecture.md#generic-export-verification).
+
+### Implemented HTTP Response Conversion
+
+The public [into_http_response](../../crates/rubicon/src/http_response.rs) accepts a `RenderResponse` and returns `Result<axum::response::Response, String>`. It validates the complete supplied header list before returning a response. The current host policy accepts final statuses from 200 through 599 and rejects all other numbers, including informational statuses. Nonempty bodies for 204, 205, and 304 are rejected rather than silently discarded; the absence-of-content rules follow [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-15).
+
+Header names and values are parsed with `HeaderName::from_bytes` and `HeaderValue::from_str`. Parsed names are normalized before applying the transport-header policy. The helper rejects Connection, Content-Length, Transfer-Encoding, Keep-Alive, Proxy-Connection, TE, Trailer, and Upgrade. These fields remain controlled by the HTTP server. This prototype policy also rejects application-supplied optional Content-Length metadata for HEAD or 304; representation-length behavior must be verified when the helper is connected to the handler.
+
+Accepted pairs are appended to `HeaderMap`, preserving separate Set-Cookie values and their order. The body is moved into `Body::from`, and the validated status and headers are assigned to the Axum response. The helper supplies no default Content-Type, calculates no Content-Length header itself, and does not validate all status-specific application semantics. Applications must supply their intended content type. Response-size limits, conditional-request handling, and actual HTTP transport behavior remain separate work.
+
+Four repository unit tests verify status 302 with Location, two distinct cookies, exact Unicode body bytes, rejected status numbers, invalid header syntax, rejected renderer framing headers, and empty-body requirements. These are response-object checks, not network delivery evidence. The live worker and handler still use the earlier string-result path. See the [conversion verification](architecture.md#http-response-conversion-verification).
 
 ### Terminal Outcomes
 
@@ -155,7 +165,7 @@ The benchmark must account for conversion and data-copy costs. Streaming would r
 | RC-01 | Exercise query parameters, direct route access, methods, repeated headers, and identifiers. | Request conversion, concurrent identifier generation, and exhaustion checks. | Partial: URL path/query, GET/HEAD method, repeated text headers, and process-local string identifiers verified; arbitrary header bytes unsupported. |
 | RC-02 | Alternate contexts and complete an operation after cancellation. | Request-scope checks. | Planned |
 | RC-03 | Exercise each terminal outcome and attempted late completion. | Outcome checks. | Planned |
-| RC-04 | Check status, redirects, Set-Cookie, and body content. | HTTP delivery checks. | Partial: successful 200 HTML delivery verified; application response metadata planned. |
+| RC-04 | Check status, redirects, Set-Cookie, and body content. | Response-object and HTTP delivery checks. | Partial: response-object conversion and successful 200 HTML delivery verified; application metadata transport planned. |
 | RC-05 | Compare GET representation metadata with HEAD delivery. | HTTP delivery checks. | Partial: empty body and demonstration GET representation length verified; complete application metadata planned. |
 | RC-06, RC-07 | Expire or cancel work, then render a new request on recovered capacity. | Cleanup and recovery checks. | Partial: continued execution after ordinary JavaScript and conversion errors verified; cancellation, cleanup, and replacement planned. |
 | RC-08 | Hydrate a page and perform a representative interaction. | Browser check. | Planned |

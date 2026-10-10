@@ -3,10 +3,12 @@ use std::{path::Path, rc::Rc};
 use deno_core::{
     FsModuleLoader, JsRuntime, ModuleId, ModuleSpecifier, RuntimeOptions, serde_v8, v8,
 };
+mod http_response;
 mod renderer;
 mod request;
 mod response;
 
+pub use http_response::into_http_response;
 pub use renderer::{RenderError, Renderer};
 pub use request::RenderRequest;
 pub use response::RenderResponse;
