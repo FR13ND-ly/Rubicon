@@ -525,6 +525,8 @@ This establishes timer fulfillment and explicit JavaScript timer cancellation in
 
 ## Open Questions
 
+The [temporary streams and abort check](../experiments/001-angular-runtime-compatibility.md#streams-and-abort-prototype) verified a proposal adding the exception and event interfaces, AbortController/AbortSignal, and three stream constructors. A fourth fixture checked Unicode pipeline content, closure, and signal-driven cancellation while retaining the existing response/error comparisons. All copy checks passed; these globals and the fixture are not yet applied to the repository. The HTTP response remains buffered, and host request cancellation remains unspecified.
+
 | Question | Impact | Next action |
 | --- | --- | --- |
 | Which generated Angular entrypoint and manifests are required? | Defines the artifact-loading integration. | Use the implemented neutral build and verify lazy bootstrap and asset imports during embedded rendering. |

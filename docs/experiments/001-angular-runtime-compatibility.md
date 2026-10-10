@@ -254,6 +254,146 @@ Repository formatting verification, locked offline all-target compilation, and t
 
 Timer callback execution and explicit cancellation are now implemented and verified. This does not establish a host request-cancellation policy, automatic application timer cleanup, deadline enforcement, embedded Angular rendering, or performance.
 
+## Streams and Abort Prototype
+
+A temporary copy of the timer implementation committed as `4948ffc` checked eight additional globals from the pinned deno_web 0.290.0 scripts: DOMException, Event, EventTarget, AbortController, AbortSignal, ReadableStream, WritableStream, and TransformStream. The existing URL, encoding, and timer globals were retained. No dependency, lockfile dependency resolution, worker scheduler, or HTTP change was needed.
+
+The bootstrap loads the exception and event interfaces before abort support and streams:
+
+```javascript
+const { DOMException } = core.loadExtScript('ext:deno_web/01_dom_exception.js');
+const { Event, EventTarget } = core.loadExtScript('ext:deno_web/02_event.js');
+const { AbortController, AbortSignal } = core.loadExtScript(
+  'ext:deno_web/03_abort_signal.js',
+);
+const { ReadableStream, WritableStream, TransformStream } = core.loadExtScript(
+  'ext:deno_web/06_streams.js',
+);
+```
+
+These values are added to the existing object used to define writable, configurable globals. The script paths, returned exports, and internal dependencies were reviewed in the downloaded pinned crate sources. Abort support uses events, and its default abort reason requires the public DOMException constructor. The streams script also loads the abort implementation internally.
+
+The copy added this exact `tests/fixtures/renderer_streams.mjs` and included it as the fourth module in the integration executable:
+
+```javascript
+import { render as renderSync } from "./renderer_errors.mjs";
+
+async function checkStreamPipeline() {
+    let text = "";
+    let closed = false;
+
+    const source = new ReadableStream({
+        start(controller) {
+            controller.enqueue("Răspuns ");
+            controller.enqueue("🦀");
+            controller.close();
+        },
+    });
+
+    const encoder = new TransformStream({
+        transform(chunk, controller) {
+            controller.enqueue(new TextEncoder().encode(chunk));
+        },
+    });
+
+    const destination = new WritableStream({
+        write(chunk) {
+            text += new TextDecoder("utf-8", { fatal: true }).decode(chunk);
+        },
+        close() {
+            closed = true;
+        },
+    });
+
+    await source.pipeThrough(encoder).pipeTo(destination);
+
+    if (text !== "Răspuns 🦀" || !closed) {
+        throw new Error("Stream pipeline lost content or did not close");
+    }
+}
+
+async function checkAbort() {
+    const controller = new AbortController();
+    const reason = new Error("intentional stream cancellation");
+    let abortEvents = 0;
+    let validEvent = false;
+    let cancelledWith;
+    let abortedWith;
+
+    controller.signal.addEventListener("abort", (event) => {
+        abortEvents += 1;
+        validEvent = event instanceof Event && event.type === "abort";
+    });
+
+    const source = new ReadableStream({
+        cancel(value) {
+            cancelledWith = value;
+        },
+    });
+    const destination = new WritableStream({
+        abort(value) {
+            abortedWith = value;
+        },
+    });
+
+    const completion = source.pipeTo(destination, { signal: controller.signal });
+    controller.abort(reason);
+    controller.abort(new Error("must not replace the first reason"));
+
+    let rejection;
+    try {
+        await completion;
+    } catch (error) {
+        rejection = error;
+    }
+
+    if (
+        !(controller.signal instanceof EventTarget) ||
+        !controller.signal.aborted ||
+        controller.signal.reason !== reason ||
+        abortEvents !== 1 ||
+        !validEvent ||
+        rejection !== reason ||
+        cancelledWith !== reason ||
+        abortedWith !== reason
+    ) {
+        throw new Error("Abort did not propagate through the stream pipeline");
+    }
+
+    const signal = AbortSignal.abort();
+    if (
+        !(signal instanceof AbortSignal) ||
+        !signal.aborted ||
+        !(signal.reason instanceof DOMException) ||
+        signal.reason.name !== "AbortError"
+    ) {
+        throw new Error("Default abort reason is not an AbortError");
+    }
+}
+
+export async function render(request) {
+    await checkStreamPipeline();
+    await checkAbort();
+    return renderSync(request);
+}
+```
+
+The successful pipeline reads two Unicode text chunks, transforms them into UTF-8 bytes, decodes them in a writable sink, and verifies both content and sink closure. This fixture encodes complete strings in each chunk; it does not test decoding a multibyte character split across byte chunks.
+
+The cancellation check starts a pipeline with an otherwise idle readable source. Aborting its signal must reject the pipeline with the original Error object, invoke the source's cancel callback and sink's abort callback with that same object, emit exactly one abort Event, and preserve the first reason across a repeated abort call. A separate AbortSignal.abort call must create an already-aborted signal with a DOMException named AbortError. Each render then delegates to the existing response/error fixture, preserving exact response comparisons and recovery across its five calls.
+
+On 2026-10-10, the copy passed:
+
+```text
+cargo fmt --manifest-path <copy>/Cargo.toml
+cargo check --locked --offline --manifest-path <copy>/Cargo.toml --all-targets --target-dir C:/Users/motri/Desktop/rubicon/crates/rubicon/target
+cargo test --locked --offline --manifest-path <copy>/Cargo.toml --target-dir C:/Users/motri/Desktop/rubicon/crates/rubicon/target
+```
+
+Eight library tests, four executable tests, and all four renderer fixtures passed, including `Renderer fixture passed: renderer_streams.mjs`. One macro-generated documentation example was ignored, and LNK4098 persisted. The temporary package used `rubicon-streams-probe` with library name `rubicon` and a corresponding root package rename in the copied lockfile. It reused the ignored target directory and was removed after verification. Full local output remains in ignored `crates/rubicon/target/streams-foundation-probe.log`.
+
+This is a verified proposal awaiting author implementation. It establishes selected JavaScript stream and abort behavior in the existing worker, not complete standards conformance. The Rust response body remains a buffered String; no HTTP streaming transport or host request cancellation is implemented by this proposal. Fetch objects, network operations, application resource cleanup, Angular request execution, and performance remain pending.
+
 ## Sources
 
 - [Angular non-Node SSR configuration](https://angular.dev/guide/ssr#non-nodejs), checked on 2026-10-10.
