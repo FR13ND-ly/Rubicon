@@ -204,6 +204,10 @@ Later on 2026-10-10, the Node.js reference application added Home and About page
 
 This establishes a small Angular SSR and hydration reference on Node.js. It does not establish compatibility with the Rust-owned runtime. The same application must still pass after integration into deno_core, and native services, isolation, cleanup, and performance remain unverified. The runtime decision remains Draft.
 
+### Angular Neutral Bundle Diagnostic
+
+The [compatibility experiment](../experiments/001-angular-runtime-compatibility.md) built a public, platform-neutral Angular entrypoint in a temporary copy and successfully loaded and evaluated its generated server module through the unchanged deno_core runtime. Its handler rendered the reference pages when invoked in Node.js with real Web API objects. Missing Web globals were inventoried in deno_core, but no embedded Angular render was invoked. The prototype therefore has a verified entrypoint direction; runtime APIs, complete embedded SSR, hydration, isolation, cleanup, and performance still require evidence. The ADR remains Draft.
+
 ## Decision History
 
 | Date | Change | Reason |
@@ -216,3 +220,4 @@ This establishes a small Angular SSR and hydration reference on Node.js. It does
 | 2026-10-10 | Record Promise-returning renderer checks. | Verify a local import, fulfillment, rejection after an awaited microtask, typed response conversion, and continued execution while keeping native I/O and Angular acceptance pending. |
 | 2026-10-10 | Record Angular 22.2.2 on the conventional Node.js server. | Establish a pinned application and verified SSR reference before embedded-runtime compatibility work. |
 | 2026-10-10 | Record routed pages, counter interaction, and Node.js reference hydration. | Establish observable browser behavior to repeat after embedded-runtime integration. |
+| 2026-10-10 | Record neutral bundle loading and missing Web globals. | Verify a public Angular entrypoint direction in a temporary copy while keeping actual embedded SSR and runtime acceptance pending. |

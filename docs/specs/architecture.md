@@ -485,12 +485,18 @@ A fresh in-app browser tab loaded Home from the Node.js server. Its console repo
 
 The [browser capture](../assets/angular-reference-counter.jpg) records Home after the two increment clicks. This is a correctness observation for the conventional Node.js development build, not performance evidence or retained browser regression automation. Counter reset on navigation does not establish isolation between server requests. Angular loading inside deno_core, equivalent browser delivery through Axum, native services, lifecycle guarantees, and performance remain pending. See the [application guide](../../examples/angular-demo/README.md#browser-hydration-check) and [runtime decision record](../adr/001-runtime-selection.md#angular-routes-and-hydration).
 
+### Angular Neutral Bundle Diagnostic
+
+On 2026-10-10, an isolated copy of the routed reference application built a public `AngularAppEngine`/`createRequestHandler` entrypoint with `ssr.platform: "neutral"`. A parser scan found no static external imports and one unexercised dynamic `xhr2` import. Direct Web handler calls in Node.js returned SSR responses for Home and About and `null` for an unknown route. Rubicon's existing bare deno_core runtime then loaded and evaluated the generated neutral `server.mjs` successfully.
+
+No Angular render call was made in deno_core. The runtime inventory found console and queueMicrotask present but URL, Request, Response, headers, encoders, streams, abort support, timers, performance, and fetch absent. Presence checks do not determine the complete required API set. The [compatibility experiment](../experiments/001-angular-runtime-compatibility.md) records the temporary source/configuration changes, commands, diagnostic, outcomes, and limitations. The experiment did not change framework or application sources; the neutral entrypoint is ready for the author to implement next. Runtime Web API registration, actual embedded SSR, browser asset delivery, hydration, and lifecycle acceptance remain pending.
+
 ## Open Questions
 
 | Question | Impact | Next action |
 | --- | --- | --- |
-| Which generated Angular entrypoint and manifests are required? | Defines the artifact-loading integration. | Inspect a pinned example build. |
-| Which Web or Node APIs are required by the application bundle? | Determines runtime extensions. | Run a compatibility spike and inventory dependencies. |
+| Which generated Angular entrypoint and manifests are required? | Defines the artifact-loading integration. | Implement the checked neutral entrypoint and configuration, then verify lazy bootstrap and asset imports during rendering. |
+| Which Web or Node APIs are required by the application bundle? | Determines runtime extensions. | Use the recorded missing-global inventory to register compatible Web APIs and exercise SSR; investigate optional dynamic imports separately. |
 | How will blocking JavaScript be interrupted safely? | Determines deadline enforcement and recovery. | Prototype the selected engine's interruption mechanism. |
 | Which native service calls are exposed to the adapter? | Defines scope and data ownership. | Specify one deterministic asynchronous operation. |
 | What pool and queue settings meet the resource budget? | Controls latency and memory. | Pilot under the benchmark protocol. |

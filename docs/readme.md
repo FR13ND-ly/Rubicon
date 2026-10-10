@@ -26,3 +26,7 @@ A separate Angular 22.2.2 application now serves Home and About pages through it
 6. [Angular reference application](../examples/angular-demo/README.md)
 
 Update this index when document status changes or new documents are added.
+
+## Experiments
+
+- [001: Angular neutral bundle compatibility](experiments/001-angular-runtime-compatibility.md), Completed exploratory check: a temporary neutral build's module loaded in bare deno_core, while actual embedded rendering and required Web API support remain pending. This is correctness evidence, not a performance benchmark.
