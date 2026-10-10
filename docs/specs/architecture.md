@@ -513,9 +513,17 @@ cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
 
 Eight library tests and four executable unit tests passed, and both renderer fixture success messages were printed. One macro-generated documentation example was ignored. The existing LNK4098 warning persists. These checks establish the selected Web APIs and continued prototype behavior; they do not establish complete Web API conformance, public timer support, streams, Fetch objects, native network I/O, Angular rendering, or performance. The earlier [temporary check](../experiments/001-angular-runtime-compatibility.md#web-foundation-prototype) records the V8 delayed-task failure behind the Tokio context requirement. The [repository follow-up](../experiments/001-angular-runtime-compatibility.md#repository-web-foundation-verification) records the implemented step.
 
-## Open Questions
+### Web Timers Verification
 
-The [temporary Web timers check](../experiments/001-angular-runtime-compatibility.md#web-timers-prototype) verified a proposal exposing four timer globals and adding an integration fixture that awaits callbacks, cancels a timeout, and stops an interval. It passed the current response/error sequence through a worker without changing scheduling code. The proposal is not yet applied to the repository; the implemented runtime still exposes the four URL/encoding globals listed above.
+On 2026-10-10, starting from `0944362`, the author exposed setTimeout, clearTimeout, setInterval, and clearInterval from the pinned Deno timer script through the existing bootstrap. The integration executable now checks `renderer_timers.mjs` after the synchronous and microtask fixtures, with a fresh worker for each module. No dependency, request type, HTTP handler, or worker scheduler changed.
+
+Each of the five timer fixture calls cancels a zero-delay timeout, awaits two interval callbacks and clears the interval, then awaits a five-millisecond timeout before checking that the cancelled callbacks did not run again. It delegates to the existing response/error fixture, preserving the exact response comparisons, rejection on call 2, conversion failure on call 4, and successful calls 1, 3, and 5.
+
+Repository formatting verification, locked offline compilation for all targets, and the full locked offline test command passed using the same commands as the URL/UTF-8 milestone above. Eight library tests, four executable tests, and all three renderer fixtures passed; one macro-generated documentation example was ignored. LNK4098 persists. The [experiment follow-up](../experiments/001-angular-runtime-compatibility.md#repository-web-timers-verification) records the implemented step.
+
+This establishes timer fulfillment and explicit JavaScript timer cancellation in controlled renders. The delay values are correctness inputs, not timer precision or performance measurements. It does not establish request cancellation, cleanup of arbitrary application timers, blocking JavaScript interruption, or HTTP deadline enforcement. Streams, Fetch objects, embedded Angular rendering, and performance evaluation remain pending.
+
+## Open Questions
 
 | Question | Impact | Next action |
 | --- | --- | --- |

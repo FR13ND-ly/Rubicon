@@ -6,7 +6,11 @@ use rubicon::{RenderError, RenderRequest, RenderResponse, Renderer};
 async fn main() -> Result<(), String> {
     deno_core::JsRuntime::init_platform(None);
 
-    for fixture_name in ["renderer_errors.mjs", "renderer_async.mjs"] {
+    for fixture_name in [
+        "renderer_errors.mjs",
+        "renderer_async.mjs",
+        "renderer_timers.mjs",
+    ] {
         check_renderer_fixture(fixture_name).await?;
     }
 

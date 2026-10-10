@@ -246,6 +246,14 @@ Formatting, locked offline all-target compilation, and the full locked offline t
 
 This is a verified proposal awaiting author implementation. It checks timer fulfillment and explicit JavaScript timer cancellation within controlled renders. It does not establish request cancellation, general cleanup of application timers, interruption of blocking JavaScript, HTTP deadline behavior, streams, Fetch objects, Angular rendering, or performance.
 
+## Repository Web Timers Verification
+
+On 2026-10-10, the author applied the timer proposal to the actual crate, starting from `0944362`. The bootstrap exposes the four timer globals, `renderer_timers.mjs` matches the checked proposal, and the integration executable includes it as a third fixture. Dependencies and worker scheduling are unchanged.
+
+Repository formatting verification, locked offline all-target compilation, and the full locked offline test command passed. Eight library tests, four executable tests, and all three fixture success messages passed, with one ignored macro-generated documentation example. The timer fixture retains exact response and failure comparisons across five calls. The [architecture milestone](../specs/architecture.md#web-timers-verification) records the behavior and limits. LNK4098 remains present.
+
+Timer callback execution and explicit cancellation are now implemented and verified. This does not establish a host request-cancellation policy, automatic application timer cleanup, deadline enforcement, embedded Angular rendering, or performance.
+
 ## Sources
 
 - [Angular non-Node SSR configuration](https://angular.dev/guide/ssr#non-nodejs), checked on 2026-10-10.
