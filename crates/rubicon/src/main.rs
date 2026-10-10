@@ -11,6 +11,7 @@ use axum::{
     routing::get,
 };
 use rubicon::{RenderError, RenderRequest, Renderer, into_http_response};
+use tower_http::services::ServeDir;
 
 const APPLICATION_ORIGIN: &str = "http://127.0.0.1:3000";
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
@@ -24,10 +25,19 @@ async fn main() -> Result<(), String> {
 
     let renderer = Renderer::start(module_path).await?;
 
-    let app = Router::new()
+    let browser_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/angular-demo/dist/rubicon/browser");
+
+    let ssr = Router::new()
         .route("/", get(root))
         .route("/{*path}", get(root))
         .with_state(renderer);
+
+    let app = Router::new().fallback_service(
+        ServeDir::new(browser_path)
+            .append_index_html_on_directories(false)
+            .fallback(ssr),
+    );
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await

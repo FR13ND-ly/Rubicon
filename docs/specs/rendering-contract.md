@@ -2,14 +2,14 @@
 
 **Status:** Draft
 **Created:** 2026-10-09
-**Last updated:** 2026-10-10
-**Implementation:** Structured transport connected to HTTP; synchronous and Promise-returning exports checked; Angular adapter not implemented
+**Last updated:** 2026-10-11
+**Implementation:** Structured Angular adapter connected to HTTP; browser assets and development/production interactions checked; scoped native operations and lifecycle controls pending
 
 ## Purpose and Context
 
 The rendering contract defines the boundary between the Rust HTTP host and the application's Angular renderer. It specifies request information, response outcomes, lifecycle responsibilities, and failure behavior.
 
-This is a semantic contract for the intended prototype. The current implementation passes an object containing a string request identifier, URL, method, and text header pairs to a JavaScript `render(request)` export and receives a structured status, header list, and buffered body. The Rust handler validates that response before HTTP delivery. The complete Angular adapter's Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
+This is a semantic contract for the intended prototype. The current implementation passes an object containing a string request identifier, URL, method, and text header pairs to a JavaScript `render(request)` export and receives a structured status, header list, and buffered body. The Rust handler validates that response before HTTP delivery. The implemented [Angular adapter](../../examples/angular-demo/src/server.rubicon.ts) exports render from the generated neutral server/server.mjs entry. It constructs a Web Request, invokes AngularAppEngine, maps null to 404, preserves separate Set-Cookie fields, and reads Response.text into the buffered body. Native-operation context, cancellation, and lifecycle semantics remain design work. The current worker depends directly on the deno_core adapter; replacement engines still require integration work.
 
 The intended boundary permits a future runtime replacement without changing application-facing request semantics. Engine lifecycle and integration work still belong to the replacement adapter.
 
@@ -45,7 +45,7 @@ The adapter must preserve Angular's hydration requirements. Standard Angular Tra
 6. The host validates status and headers, applies HTTP transport rules, and delivers or discards the result according to cancellation state.
 7. All request-owned resources are released, including pending operations and Angular application resources.
 
-AngularAppEngine is a candidate public integration point because its handle method accepts a Request and optional context and returns a Response or null. Compatibility with the embedded environment still requires validation.
+AngularAppEngine is the implemented public integration point. Its handle method accepts a Request and optional context and returns a Response or null. The reference Angular 22.2.2 pages pass embedded rendering and browser checks. The current adapter does not supply a native-service request context, and broader application compatibility remains unverified.
 
 ## Contracts and Data
 
@@ -55,7 +55,7 @@ AngularAppEngine is a candidate public integration point because its handle meth
 
 GET handlers for `/` and `/{*path}` obtain `OriginalUri` and append its original path and query to the fixed application origin `http://127.0.0.1:3000`. The host does not decode or reconstruct query parameters. Source review confirms that request `Host` and forwarded headers are not used to construct this origin; header-spoofing behavior has not been separately exercised. Configurable origins, trusted proxies, and URL size and validation policies remain open.
 
-The handler also extracts the actual HTTP `Method` and stores its string form. For HEAD, the demonstration displays `GET` as the page method while retaining `HEAD` in the request object. The module escapes `&`, `<`, `>`, double quotes, and apostrophes when displaying the page method and URL as HTML text. Every matched GET or HEAD page path invokes the demonstration renderer; this does not implement Angular route matching, application 404 outcomes, or precedence for API and browser-asset paths.
+The handler extracts the actual HTTP Method and stores its string form. ServeDir first handles existing browser files, with directory index lookup disabled. Unmatched GET or HEAD requests reach the Angular adapter, which forwards the method and text header pairs through a Web Request. Angular renders its configured routes; a null result becomes the application's 404 response. Axum omits the HEAD body, and checked Content-Length values match the GET representation. The earlier demonstration that displayed and manually escaped request values remains a historical fixture rather than the executable's application entrypoint. Explicit API endpoints and a general route-precedence policy remain future work.
 
 The handler extracts `HeaderMap` and converts each value into a separate name-value pair using `keys()` and `get_all()`. Repeated values remain separate and retain their per-name order; ordering across different names is unspecified. Names use their normalized lowercase form. Values rejected by `HeaderValue::to_str()` produce HTTP 400 before worker admission. This is a provisional supported-text policy, not a classification of every rejected value as invalid HTTP. Arbitrary valid header byte sequences remain unsupported. The demonstration displays only `x-rubicon-demo` values with HTML text escaping.
 

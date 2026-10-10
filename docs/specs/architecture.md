@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-11
-**Implementation:** Rust HTTP server rendering Angular through a persistent embedded worker; Node.js hydration reference; browser assets and hydration through Rust pending
+**Implementation:** Rust HTTP server rendering Angular through a persistent embedded worker and serving browser assets; development and production Angular browser checks passed; lifecycle controls and benchmarks pending
 
 ## Purpose and Context
 
@@ -572,6 +572,14 @@ The [browser asset experiment](../experiments/005-browser-assets-hydration.md), 
 | How will blocking JavaScript be interrupted safely? | Determines deadline enforcement and recovery. | Prototype the selected engine's interruption mechanism. |
 | Which native service calls are exposed to the adapter? | Defines scope and data ownership. | Specify one deterministic asynchronous operation. |
 | What pool and queue settings meet the resource budget? | Controls latency and memory. | Pilot under the benchmark protocol. |
+
+### Browser Assets and Repository Browser Verification
+
+On 2026-10-11, the author added tower-http 0.7.1 with fs and made ServeDir the outer router's fallback service. Existing files in dist/rubicon/browser are served before the Angular page fallback. Directory index lookup is disabled so the root request reaches SSR. The server output directory is outside the file root; five checked missing paths retained the adapter's 404 result. SSR responses remain buffered.
+
+The actual repository executable passed HTTP and browser checks with development,rubicon and production,rubicon Angular builds. Both builds prerendered zero routes. Home/About SSR, query routing, page and asset HEAD metadata, JavaScript/CSS/favicon MIME types, and downloaded file hashes passed. Development diagnostics confirmed Home/About hydration with zero skipped components. Counter interaction, navigation, direct About reload, and empty warning/error logs passed for both builds. A fresh host process loaded each configuration. The Rust executable was a debug build; these checks do not establish performance results. See [experiment 005](../experiments/005-browser-assets-hydration.md#repository-verification) for commands, exact outcomes, screenshot, and remaining acceptance work.
+
+Locked all-target compilation and the full test suite passed for the same author changes; formatting and the executable build also passed. The source remains a single-worker prototype with fixed artifact paths and origin. Native services, request isolation, cleanup, cancellation, recovery, configurable deployment, and measured performance remain pending.
 
 ## Related Decisions and Sources
 

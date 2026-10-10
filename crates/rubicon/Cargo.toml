@@ -12,6 +12,7 @@ deno_fetch = "=0.283.0"
 deno_net = "=0.251.0"
 tokio = { version = "=1.53.2", features = ["rt", "macros", "rt-multi-thread", "net", "sync", "time"] }
 serde = { version = "=1.0.229", features = ["derive"] }
+tower-http = { version = "=0.7.1", features = ["fs"] }
 
 [[test]]
 name = "renderer_errors"

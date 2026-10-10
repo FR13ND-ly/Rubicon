@@ -27,7 +27,7 @@ No runtime has been benchmarked in this project. This ADR records a candidate fo
 
 | Option | Benefits | Costs and limitations | Evidence or unknowns |
 | --- | --- | --- | --- |
-| deno_core with selected extensions | Rust embedding APIs, V8 execution, explicit native operations, and control of integration. | Requires construction of the needed environment and module-loading behavior. | Core capabilities are documented; Angular compatibility and performance are unverified. |
+| deno_core with selected extensions | Rust embedding APIs, V8 execution, explicit native operations, and control of integration. | Requires construction of the needed environment and module-loading behavior. | Angular 22.2.2 reference SSR and browser behavior passed through Rust in development and production Angular configurations; native services, lifecycle acceptance, and performance remain unverified. |
 | deno_runtime | Assembles a broader Deno environment on top of deno_core. | More dependencies and configuration; application module resolution still needs integration. | The runtime source demonstrates Web/API extensions; fit for this Angular build is unverified. |
 | Persistent Bun process controlled by Rust | Alternative renderer environment with an independent lifecycle. | IPC, process management, data transport, and total process memory must be counted. | Angular execution and equivalent request semantics require a prototype. |
 | Bun embedding through a community project or future official API | Potential in-process alternative using JavaScriptCore. | Supported platforms, upstream coupling, lifecycle guarantees, and packaging need review. | A community libbun project exists; the official embedding request remains open as checked on 2026-10-09. |
@@ -208,6 +208,12 @@ This establishes a small Angular SSR and hydration reference on Node.js. It does
 
 The [compatibility experiment](../experiments/001-angular-runtime-compatibility.md) built a public, platform-neutral Angular entrypoint in a temporary copy and successfully loaded and evaluated its generated server module through the unchanged deno_core runtime. Its handler rendered the reference pages when invoked in Node.js with real Web API objects. Missing Web globals were inventoried in deno_core, but no embedded Angular render was invoked. The prototype therefore has a verified entrypoint direction; runtime APIs, complete embedded SSR, hydration, isolation, cleanup, and performance still require evidence. The ADR remains Draft.
 
+### Angular Browser Assets Through the Repository Host
+
+On 2026-10-11, the author implemented the file service with tower-http 0.7.1. The [repository follow-up](../experiments/005-browser-assets-hydration.md#repository-verification) verified actual Home/About SSR, matching browser assets, query routing, HEAD, missing paths, counter interaction, navigation, and direct route reload with both development and production Angular builds. Development diagnostics confirmed hydration without skipped components, and warning/error logs were empty in both configurations. The Rust executable was built in debug mode.
+
+This establishes the current reference application's compatibility with the embedded environment. The original acceptance conditions remain unchanged: scoped asynchronous native services, request isolation, cleanup after success and failure, and lifecycle behavior still need verification. The ADR remains Draft, and no performance preference over Node.js or another engine has been established.
+
 ## Decision History
 
 | Date | Change | Reason |
@@ -230,3 +236,4 @@ The [compatibility experiment](../experiments/001-angular-runtime-compatibility.
 | 2026-10-11 | Record a checked TypeScript adapter and temporary Rust HTTP delivery. | Verify the rebuilt render export, Home/About SSR, fallback 404, query routing, and HEAD delivery through Axum; repository implementation, browser assets, hydration, lifecycle acceptance, and performance remain pending. |
 | 2026-10-11 | Record implemented Angular HTTP integration. | Verify the actual neutral build and Rust executable delivering Home/About SSR, fallback 404, query routing, and HEAD; browser files still return 404 and hydration, lifecycle acceptance, and benchmarks remain pending. |
 | 2026-10-11 | Record a checked browser file-service proposal and temporary hydration. | Verify JavaScript/CSS/favicon bytes and HTTP metadata, Home/About hydration, counter interaction, navigation, reload, and empty warning/error logs through the temporary Rust host; author implementation, lifecycle acceptance, production checks, and benchmarks remain pending. |
+| 2026-10-11 | Record implemented browser assets and development/production repository checks. | Verify the author's tower-http 0.7.1 integration, matching asset bytes, SSR/HEAD behavior, development hydration diagnostics, and browser interactions for both Angular configurations; keep native services, lifecycle acceptance, and performance pending. |
