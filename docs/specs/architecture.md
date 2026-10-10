@@ -49,7 +49,7 @@ The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one 
 | Worker channel or reply channel closed | 503 with a generic unavailable response. |
 | Export execution or result conversion fails | 500 with a generic failure response; details are logged server-side. |
 
-The demonstration module displays URL and method using HTML text escaping and maintains a render counter to show engine and module persistence. A job currently carries only those two fields of the proposed request model. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. HEAD's Content-Length currently reflects the method-specific demonstration HTML; aligning it with the GET representation is still required. The following Angular request flow remains a proposal.
+The demonstration module displays URL and a page method using HTML text escaping and maintains a render counter to show engine and module persistence. For HEAD, the page method is `GET`, so the generated HTML describes the corresponding GET representation; the actual request method remains `HEAD`. A job currently carries only URL and method from the proposed request model. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. Empty HEAD delivery and demonstration Content-Length matching the GET representation are verified. The following Angular request flow remains a proposal.
 
 ### Proposed Components
 
@@ -162,7 +162,7 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 | ARCH-04 | Offer work above capacity and inspect admission and queue counts. | Scheduler checks and overload run. | Partial: controlled queue rejection verified; configured scheduling and HTTP overload planned. |
 | ARCH-05 | Alternate identities and verify cleanup after successful and failed renders. | Isolation checks and sustained-operation run. | Planned |
 | ARCH-06 | Exercise service success, failure, and late completion. | Native-service integration checks. | Planned |
-| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: URL/method propagation, successful HTML delivery, and HEAD body omission verified; HEAD length correction and complete response contract remain open. |
+| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: URL/method propagation, successful HTML delivery, HEAD body omission, and demonstration HEAD representation length verified; complete response contract planned. |
 | ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Partial: continued execution after ordinary renderer errors verified; cancellation and shutdown planned. |
 
 ### Initial HTTP Host Verification
@@ -284,11 +284,31 @@ Both library tests passed, and the standalone integration target printed `Render
 
 All three requests to the author's already-running server returned 200 and `Content-Type: text/html; charset=utf-8`. The GET bodies displayed the original absolute URL with `&amp;`, `Method: GET`, and counters 3 and 5. Their Content-Length was 111. HEAD returned no body and reported Content-Length 112.
 
-The HEAD length reveals an incomplete metadata policy in the demonstration: displaying `HEAD` creates one extra byte compared with displaying `GET`. RFC 9110 section 8.6 requires a reported HEAD Content-Length to describe the corresponding GET content. The renderer must therefore align the demonstration's HEAD representation with GET before RC-05 can be accepted.
+At this milestone, the HEAD length revealed an incomplete metadata policy in the demonstration: displaying `HEAD` created one extra byte compared with displaying `GET`. RFC 9110 section 8.6 requires a reported HEAD Content-Length to describe the corresponding GET content. The correction is recorded separately below.
 
-A candidate adjustment displays `GET` in the page representation for both GET and HEAD, while retaining the actual method in the request object. A router test in a temporary copy passed with exact GET HTML, an empty HEAD body, and HEAD Content-Length matching the corresponding GET representation. The check used Tower only as a temporary test dependency. Neither the adjustment nor that temporary test has been added to the repository; the correction remains the next implementation step.
+A candidate adjustment displayed `GET` in the page representation for both GET and HEAD, while retaining the actual method in the request object. A router test in a temporary copy passed with exact GET HTML, an empty HEAD body, and HEAD Content-Length matching the corresponding GET representation. The check used Tower only as a temporary test dependency. At this milestone, the adjustment had not yet been applied to the repository. The temporary test was not retained in the repository.
 
 Repeated headers, request identity, context, full response outcomes, asynchronous JavaScript rendering, Angular SSR, cleanup, interruption, and performance measurements remain future work. These checks establish the URL/method object boundary and observed body omission, not full HTTP-contract correctness.
+
+### HEAD Representation Metadata Correction
+
+On 2026-10-10, the author applied the verified adjustment to [render.mjs](../../crates/rubicon/js/render.mjs). A local `pageMethod` uses `GET` when `request.method` is `HEAD`; the request object itself is unchanged. Both displayed fields still use HTML text escaping. The module counter still increments once per render, including HEAD.
+
+The earlier temporary router test passed once with the same adjustment. It checked exact GET HTML at counter 1, an empty HEAD body, and HEAD Content-Length against the GET representation at counter 2. Tower and that test remained confined to the temporary copy; no Rust source, dependency, or repository test changed in this correction.
+
+The following HTTP checks were repeated against the author's running server after the adjustment:
+
+```text
+curl.exe --max-time 5 -sS -i "http://127.0.0.1:3000/products?sort=asc&page=2"
+curl.exe --max-time 5 -sS -I "http://127.0.0.1:3000/products?sort=asc&page=2"
+curl.exe --max-time 5 -sS -i "http://127.0.0.1:3000/products?sort=asc&page=2"
+```
+
+All three responses returned 200 and `Content-Type: text/html; charset=utf-8`. GET returned the expected escaped URL, `Method: GET`, and counters 3 and 5. HEAD returned no body. All three Content-Length values were 111, matching the GET representation for the intervening counter value 4. The subsequent GET also confirmed continued execution after HEAD.
+
+The diagnostic counter makes the page dynamic: its length increases when the number of digits grows. A HEAD comparison must therefore use the corresponding GET representation for that render, rather than assume that all successive GET responses have equal lengths. The integration fixture continues to echo the actual `HEAD` method independently of the demonstration's page method.
+
+These checks resolve the demonstration's one-byte mismatch. They do not establish complete application status and header preservation, redirects, repeated Set-Cookie fields, Angular compatibility, or performance gains. The full Rust suite was not repeated for this JavaScript-only correction; the earlier request-object milestone records its results and the existing LNK4098 warning.
 
 ## Open Questions
 

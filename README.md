@@ -18,7 +18,7 @@ The HTTP handler combines the fixed application origin `http://127.0.0.1:3000` w
 
 Queue-full and unavailable-worker errors map to HTTP 503; rendering errors map to HTTP 500. The module initialization handshake completes before the HTTP listener is bound, but does not validate the complete renderer contract. Application origin configuration, proxy handling, request headers, request identifiers, and API/static-asset routing remain to be implemented.
 
-HEAD omits its body, but its current Content-Length describes HTML displaying `Method: HEAD`, which is one byte longer than the corresponding GET demonstration HTML. Aligning this metadata with the GET representation remains open; HEAD contract acceptance is incomplete.
+For HEAD, the demonstration generates the same page representation as GET by displaying `Method: GET`, while preserving the actual `HEAD` method in the request object. HTTP checks verified an empty HEAD body and Content-Length matching that representation. The counter can change the representation length as its number of digits grows. The complete application response contract remains future work.
 
 The module path currently uses the crate's build-time source directory. Worker configuration, asynchronous renderer verification, request isolation, deadline enforcement, graceful shutdown, deployable artifact packaging, and Angular SSR remain future steps. Linker warning LNK4098 persists; performance has not been measured.
 

@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Partial URL-and-method request object; Angular adapter not implemented; HEAD metadata correction pending
+**Implementation:** Partial URL-and-method request object; demonstration HEAD metadata verified; Angular adapter not implemented
 
 ## Purpose and Context
 
@@ -55,9 +55,9 @@ AngularAppEngine is a candidate public integration point because its handle meth
 
 GET handlers for `/` and `/{*path}` obtain `OriginalUri` and append its original path and query to the fixed application origin `http://127.0.0.1:3000`. The host does not decode or reconstruct query parameters. Source review confirms that request `Host` and forwarded headers are not used to construct this origin; header-spoofing behavior has not been separately exercised. Configurable origins, trusted proxies, and URL size and validation policies remain open.
 
-The handler also extracts the actual HTTP `Method` and stores its string form. The demonstration module escapes `&`, `<`, `>`, double quotes, and apostrophes when displaying either field as HTML text. Every matched GET or HEAD page path invokes the demonstration renderer; this does not implement Angular route matching, application 404 outcomes, or precedence for API and browser-asset paths.
+The handler also extracts the actual HTTP `Method` and stores its string form. For HEAD, the demonstration displays `GET` as the page method while retaining `HEAD` in the request object. The module escapes `&`, `<`, `>`, double quotes, and apostrophes when displaying the page method and URL as HTML text. Every matched GET or HEAD page path invokes the demonstration renderer; this does not implement Angular route matching, application 404 outcomes, or precedence for API and browser-asset paths.
 
-The job currently contains only URL and method from the request model. Repeated headers, request identifier, context, native services, and lifecycle controls remain to be added. A string result also does not implement the complete terminal-outcome and response-metadata models below. Axum omits the HEAD body, but the demonstration's Content-Length is currently based on HTML displaying `HEAD` rather than the corresponding GET representation; RC-05 remains incomplete.
+The job currently contains only URL and method from the request model. Repeated headers, request identifier, context, native services, and lifecycle controls remain to be added. A string result also does not implement the complete terminal-outcome and response-metadata models below. Axum omits the HEAD body, and the demonstration's Content-Length now matches the corresponding GET representation. Full RC-05 acceptance still requires the complete application response-metadata model.
 
 ### Request Model
 
@@ -139,7 +139,7 @@ The benchmark must account for conversion and data-copy costs. Streaming would r
 | RC-02 | Alternate contexts and complete an operation after cancellation. | Request-scope checks. | Planned |
 | RC-03 | Exercise each terminal outcome and attempted late completion. | Outcome checks. | Planned |
 | RC-04 | Check status, redirects, Set-Cookie, and body content. | HTTP delivery checks. | Partial: successful 200 HTML delivery verified; application response metadata planned. |
-| RC-05 | Compare GET representation metadata with HEAD delivery. | HTTP delivery checks. | Partial: empty HEAD body verified; demonstration Content-Length mismatch requires correction. |
+| RC-05 | Compare GET representation metadata with HEAD delivery. | HTTP delivery checks. | Partial: empty body and demonstration GET representation length verified; complete application metadata planned. |
 | RC-06, RC-07 | Expire or cancel work, then render a new request on recovered capacity. | Cleanup and recovery checks. | Partial: continued execution after ordinary JavaScript and conversion errors verified; cancellation, cleanup, and replacement planned. |
 | RC-08 | Hydrate a page and perform a representative interaction. | Browser check. | Planned |
 | RC-09 | Compare public error responses with internal diagnostics. | Failure reporting review. | Planned |
@@ -156,7 +156,13 @@ The owned request refactor was verified on 2026-10-10 with the repository format
 
 Later on 2026-10-10, the same Cargo checks passed with `url` and `method` converted into a JavaScript object. Successful integration calls verified GET/A, HEAD/B, and GET/A, retaining exact field values after the two intentional errors. The standalone executable printed `Renderer request and error checks passed.` Argument-conversion failures are classified in code but were not separately induced.
 
-Actual HTTP checks returned 200 HTML for GET, an empty HEAD response, and a subsequent successful GET. The GET counters were 3 and 5. Their Content-Length was 111; HEAD reported 112 because the demonstration includes the method name in its generated HTML. The [architecture milestone](architecture.md#request-object-and-method-verification) records commands, observations, and the required metadata correction. These checks do not establish complete RC-05 acceptance, request-context isolation, Angular compatibility, or performance gains.
+At the request-object milestone, HTTP checks returned 200 HTML for GET, an empty HEAD response, and a subsequent successful GET. The GET counters were 3 and 5. Their Content-Length was 111; HEAD reported 112 because the demonstration included the method name in its generated HTML. The [architecture milestone](architecture.md#request-object-and-method-verification) preserves those observations and the identified mismatch.
+
+### HEAD Metadata Correction Evidence
+
+Later on 2026-10-10, the author applied the demonstration's page-method adjustment. A repeated GET / HEAD / GET sequence returned 200 HTML metadata and Content-Length 111 for all three responses; HEAD delivered no body, and the GET counters were 3 and 5. The HEAD length matched the GET representation for the intervening counter value. A prior router check in a temporary copy also passed with the same adjustment, exact GET HTML, and an empty HEAD body. The [correction milestone](architecture.md#head-representation-metadata-correction) records the checks and their limits. The temporary test is not part of the repository suite.
+
+The actual request method remains available to JavaScript, including `HEAD`; the controlled worker fixture still checks that field. The demonstration now verifies body omission and its representation length. These checks do not establish complete RC-05 acceptance, request-context isolation, Angular compatibility, or performance gains.
 
 ## Open Questions
 
