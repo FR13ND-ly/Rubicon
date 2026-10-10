@@ -16,6 +16,8 @@ See the [template catalog](templates/readme.md) for specification and architectu
 
 The following documents contain drafts for author review and evidence of completed prototype steps. The Rust host transports owned request and response objects through a persistent JavaScript worker, validates response metadata, and maps rendering failures to HTTP errors. Checks cover request identifiers, repeated headers, controlled queue rejection, structured response conversion, Promise fulfillment and rejection, and continued execution after ordinary failures. The architecture records the commands, outcomes, and limits of each milestone.
 
+The embedded runtime now exposes URL, URLSearchParams, TextEncoder, and TextDecoder through pinned Deno Web extensions. Selected URL and UTF-8 behavior is checked by runtime tests executing within current-thread Tokio contexts. Other Web API families and Angular request execution remain pending.
+
 A separate Angular 22.2.2 application now serves Home and About pages through its conventional Node.js entrypoint. Direct SSR access, browser hydration, a counter interaction, and navigation have been verified. Its setup, reproduction commands, and browser screenshot are documented alongside the application. Angular execution inside Rubicon, request isolation, native services, and performance evaluation remain pending.
 
 1. [Project overview](specs/project-overview.md)

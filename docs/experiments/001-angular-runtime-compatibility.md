@@ -184,6 +184,12 @@ The all-target check passed. Eight library tests and four executable tests passe
 
 This verifies a proposed setup for four Web globals and the required test context. The author still needs to apply these Rust and JavaScript changes to the actual crate. It does not provide Request/Response/Headers, streams, abort support, public timers, performance, fetch, or Angular rendering. Those capabilities remain separate steps.
 
+## Repository Web Foundation Verification
+
+The author applied the URL/UTF-8 proposal to the actual crate, starting from commit `6314901`: exact deno_web and deno_webidl dependencies and Cargo.lock, the bootstrap extension in lib.rs, `js/web.js`, and two API tests. The existing runtime recovery test now also uses a current-thread Tokio test context. A review found that the original deno_core import had been removed; a temporary corrected-copy check passed, and the author then restored the import in the repository.
+
+On 2026-10-10, repository formatting verification, locked offline compilation for all targets, and the full locked offline test command passed. Eight library tests, four executable tests, and both renderer fixtures passed, with one ignored macro-generated documentation example. The commands and scope are recorded in the [architecture milestone](../specs/architecture.md#url-and-utf8-runtime-verification). LNK4098 remains. This implements four selected Web globals; public timers, other Web API families, actual embedded Angular rendering, and performance remain pending.
+
 ## Sources
 
 - [Angular non-Node SSR configuration](https://angular.dev/guide/ssr#non-nodejs), checked on 2026-10-10.

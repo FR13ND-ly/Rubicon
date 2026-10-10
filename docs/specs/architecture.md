@@ -497,9 +497,23 @@ After the isolated diagnostic, the author added `examples/angular-demo/src/serve
 
 This implements the build entrypoint only. Rubicon's executable still loads its demonstration module; the neutral handler has no listener, static asset service, or `render` export yet. Embedded Web API setup and Angular request execution remain the next integration steps.
 
-## Open Questions
+### URL and UTF-8 Runtime Verification
 
-An additional [temporary Web foundation check](../experiments/001-angular-runtime-compatibility.md#web-foundation-prototype) verified deno_web 0.290.0 and deno_webidl 0.259.0 registration and four exposed globals: URL, URLSearchParams, TextEncoder, and TextDecoder. URL/UTF-8 tests and the existing regression suite passed after JavaScriptRuntime unit tests were moved into current-thread Tokio contexts in the temporary copy. This is a checked proposal for the author's next Rust step, not an implemented runtime capability in the repository.
+The author implemented the checked Web foundation proposal in the actual crate on 2026-10-10, pinning deno_web to 0.290.0 and deno_webidl to 0.259.0 and updating Cargo.lock. Runtime initialization registers deno_webidl, deno_web with a per-runtime BlobStore, and the Rubicon bootstrap extension. Its `js/web.js` loads the pinned Deno implementations and exposes URL, URLSearchParams, TextEncoder, and TextDecoder as writable, configurable globals.
+
+All three JavaScriptRuntime unit tests run within current-thread Tokio contexts. The two new tests verify relative URL resolution, query decoding, repeated parameters, a Unicode query round trip, UTF-8 byte round trips with Romanian characters and an emoji, and invalid UTF-8 rejection in fatal decoding mode. The existing execution/conversion recovery test and worker fixtures continue to pass. A missing deno_core import initially caused compilation errors; the author restored that import before repository validation.
+
+The following checks passed from the repository root:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+Eight library tests and four executable unit tests passed, and both renderer fixture success messages were printed. One macro-generated documentation example was ignored. The existing LNK4098 warning persists. These checks establish the selected Web APIs and continued prototype behavior; they do not establish complete Web API conformance, public timer support, streams, Fetch objects, native network I/O, Angular rendering, or performance. The earlier [temporary check](../experiments/001-angular-runtime-compatibility.md#web-foundation-prototype) records the V8 delayed-task failure behind the Tokio context requirement. The [repository follow-up](../experiments/001-angular-runtime-compatibility.md#repository-web-foundation-verification) records the implemented step.
+
+## Open Questions
 
 | Question | Impact | Next action |
 | --- | --- | --- |

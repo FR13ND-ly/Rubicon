@@ -1,8 +1,15 @@
-use std::{path::Path, rc::Rc};
+use std::{path::Path, rc::Rc, sync::Arc};
 
 use deno_core::{
     FsModuleLoader, JsRuntime, ModuleId, ModuleSpecifier, RuntimeOptions, serde_v8, v8,
 };
+
+deno_core::extension!(
+    rubicon_web,
+    deps = [deno_webidl, deno_web],
+    esm_entry_point = "ext:rubicon_web/web.js",
+    esm = [dir "js", "web.js"],
+);
 mod http_response;
 mod renderer;
 mod request;
@@ -21,6 +28,16 @@ impl JavaScriptRuntime {
     pub fn new() -> Result<Self, String> {
         let inner = JsRuntime::try_new(RuntimeOptions {
             module_loader: Some(Rc::new(FsModuleLoader)),
+            extensions: vec![
+                deno_webidl::deno_webidl::init(),
+                deno_web::deno_web::init(
+                    Arc::new(deno_web::BlobStore::default()),
+                    None,
+                    false,
+                    Default::default(),
+                ),
+                rubicon_web::init(),
+            ],
             ..Default::default()
         })
         .map_err(|error| format!("Runtime initialization failed: {error}"))?;
@@ -130,8 +147,8 @@ impl JavaScriptRuntime {
 mod tests {
     use super::JavaScriptRuntime;
 
-    #[test]
-    fn runtime_recovers_after_execution_and_conversion_errors() -> Result<(), String> {
+    #[tokio::test(flavor = "current_thread")]
+    async fn runtime_recovers_after_execution_and_conversion_errors() -> Result<(), String> {
         let mut runtime = JavaScriptRuntime::new()?;
 
         assert_eq!(runtime.execute_i64("globalThis.counter = 0")?, 0);
@@ -152,6 +169,78 @@ mod tests {
 
         assert_eq!(runtime.execute_i64("++globalThis.counter")?, 2);
 
+        Ok(())
+    }
+    #[tokio::test(flavor = "current_thread")]
+    async fn runtime_supports_url_and_search_parameters() -> Result<(), String> {
+        let mut runtime = JavaScriptRuntime::new()?;
+
+        let result = runtime.execute_i64(
+            r#"
+            (() => {
+                const url = new URL(
+                    "/search?q=Rust%20SSR&page=2&page=3",
+                    "http://127.0.0.1:3000",
+                );
+
+                if (url.pathname !== "/search") throw new Error("Wrong URL path");
+                if (url.searchParams.get("q") !== "Rust SSR") {
+                    throw new Error("Query decoding failed");
+                }
+                if (url.searchParams.getAll("page").join(",") !== "2,3") {
+                    throw new Error("Repeated parameters were lost");
+                }
+
+                const parameters = new URLSearchParams();
+                parameters.set("message", "țară & rust");
+                const decoded = new URLSearchParams(parameters.toString());
+
+                if (decoded.get("message") !== "țară & rust") {
+                    throw new Error("Query round trip failed");
+                }
+
+                return 1;
+            })()
+            "#,
+        )?;
+
+        assert_eq!(result, 1);
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn runtime_supports_utf8_encoding_and_decoding() -> Result<(), String> {
+        let mut runtime = JavaScriptRuntime::new()?;
+
+        let result = runtime.execute_i64(
+            r#"
+            (() => {
+                const text = "Salut, țară 🌍";
+                const bytes = new TextEncoder().encode(text);
+
+                if (!(bytes instanceof Uint8Array)) {
+                    throw new Error("Encoder did not return bytes");
+                }
+                if (new TextDecoder().decode(bytes) !== text) {
+                    throw new Error("UTF-8 round trip failed");
+                }
+
+                let rejected = false;
+                try {
+                    new TextDecoder("utf-8", { fatal: true })
+                        .decode(new Uint8Array([0xff]));
+                } catch (error) {
+                    if (!(error instanceof TypeError)) throw error;
+                    rejected = true;
+                }
+
+                if (!rejected) throw new Error("Invalid UTF-8 was accepted");
+                return 1;
+            })()
+            "#,
+        )?;
+
+        assert_eq!(result, 1);
         Ok(())
     }
 }
