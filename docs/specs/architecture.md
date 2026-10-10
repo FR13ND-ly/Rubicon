@@ -523,9 +523,17 @@ Repository formatting verification, locked offline compilation for all targets, 
 
 This establishes timer fulfillment and explicit JavaScript timer cancellation in controlled renders. The delay values are correctness inputs, not timer precision or performance measurements. It does not establish request cancellation, cleanup of arbitrary application timers, blocking JavaScript interruption, or HTTP deadline enforcement. Streams, Fetch objects, embedded Angular rendering, and performance evaluation remain pending.
 
-## Open Questions
+### Streams and Abort Verification
 
-The [temporary streams and abort check](../experiments/001-angular-runtime-compatibility.md#streams-and-abort-prototype) verified a proposal adding the exception and event interfaces, AbortController/AbortSignal, and three stream constructors. A fourth fixture checked Unicode pipeline content, closure, and signal-driven cancellation while retaining the existing response/error comparisons. All copy checks passed; these globals and the fixture are not yet applied to the repository. The HTTP response remains buffered, and host request cancellation remains unspecified.
+On 2026-10-10, the author applied the checked streams/abort proposal, starting from `06b0438`. The bootstrap now exposes DOMException, Event, EventTarget, AbortController, AbortSignal, ReadableStream, WritableStream, and TransformStream in addition to the existing eight globals. The fourth integration fixture, `renderer_streams.mjs`, runs in its own persistent worker and delegates to the existing response/error fixture after its API checks. Dependencies, worker scheduling, and HTTP handling are unchanged.
+
+The fixture verifies Unicode text through a readable/transform/writable pipeline and confirms sink closure. It then aborts a separate idle pipeline, checking Promise rejection, source cancellation, sink abort, one abort Event, and preservation of the original Error object across repeated abort calls. AbortSignal.abort must produce an already-aborted signal with a DOMException named AbortError. Complete text strings are encoded per chunk; decoding multibyte characters split across byte chunks is not covered.
+
+Repository formatting verification, locked offline compilation for all targets, and the full locked offline test command passed using the commands recorded above. Eight library tests, four executable unit tests, and all four renderer fixtures passed; one macro-generated documentation example was ignored. LNK4098 persists. The new fixture preserves the exact responses and ordinary recovery sequence across all five calls. The [repository follow-up](../experiments/001-angular-runtime-compatibility.md#repository-streams-and-abort-verification) records the implemented step.
+
+This establishes selected JavaScript stream and abort behavior, not complete Web standards conformance. Rust still transports a buffered String response body; this step does not implement HTTP streaming, host request cancellation, deadlines, or general application resource cleanup. Fetch objects, network operations, embedded Angular request execution, and performance evaluation remain pending.
+
+## Open Questions
 
 | Question | Impact | Next action |
 | --- | --- | --- |

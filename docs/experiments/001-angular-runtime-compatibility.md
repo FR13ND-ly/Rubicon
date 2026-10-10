@@ -394,6 +394,14 @@ Eight library tests, four executable tests, and all four renderer fixtures passe
 
 This is a verified proposal awaiting author implementation. It establishes selected JavaScript stream and abort behavior in the existing worker, not complete standards conformance. The Rust response body remains a buffered String; no HTTP streaming transport or host request cancellation is implemented by this proposal. Fetch objects, network operations, application resource cleanup, Angular request execution, and performance remain pending.
 
+## Repository Streams and Abort Verification
+
+On 2026-10-10, the author applied the streams/abort proposal to the actual crate, starting from `06b0438`. The eight new global bindings and fourth integration fixture match the behavior of the checked copy. Bootstrap whitespace differs without changing behavior. Dependencies, worker scheduling, and HTTP handling are unchanged.
+
+Repository formatting verification, locked offline all-target compilation, and the full locked offline test command passed. Eight library tests, four executable tests, and all four fixture success messages passed, with one ignored macro-generated documentation example. The [architecture milestone](../specs/architecture.md#streams-and-abort-verification) records the API checks and preserved response/error sequence. LNK4098 remains present.
+
+The selected JavaScript stream and abort interfaces are now implemented and verified. The response body remains buffered, and host request cancellation, Fetch objects, native network operations, general resource cleanup, embedded Angular rendering, and performance remain pending.
+
 ## Sources
 
 - [Angular non-Node SSR configuration](https://angular.dev/guide/ssr#non-nodejs), checked on 2026-10-10.

@@ -8,15 +8,32 @@ const { setTimeout, clearTimeout, setInterval, clearInterval } = core.loadExtScr
   'ext:deno_web/02_timers.js',
 );
 
+const { DOMException } = core.loadExtScript('ext:deno_web/01_dom_exception.js');
+const { Event, EventTarget } = core.loadExtScript('ext:deno_web/02_event.js');
+const { AbortController, AbortSignal } = core.loadExtScript(
+  'ext:deno_web/03_abort_signal.js',
+);
+const { ReadableStream, WritableStream, TransformStream } = core.loadExtScript(
+  'ext:deno_web/06_streams.js',
+);
+
 for (const [name, value] of Object.entries({
-  URL,
-  URLSearchParams,
-  TextEncoder,
-  TextDecoder,
-  setTimeout,
-  clearTimeout,
-  setInterval,
-  clearInterval,
+    URL,
+    URLSearchParams,
+    TextEncoder,
+    TextDecoder,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    DOMException,
+    Event,
+    EventTarget,
+    AbortController,
+    AbortSignal,
+    ReadableStream,
+    WritableStream,
+    TransformStream,
 })) {
   Object.defineProperty(globalThis, name, {
     value,
