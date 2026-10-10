@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** HTTP-to-JavaScript worker prototype and Node.js Angular SSR reference; Angular integration into Rubicon pending
+**Implementation:** HTTP-to-JavaScript worker prototype and Node.js Angular SSR/hydration reference; Angular integration into Rubicon pending
 
 ## Purpose and Context
 
@@ -465,6 +465,25 @@ The production build generated browser and server directories, including `server
 A temporary process served that final build with `PORT=4107`, independently of the author's normal port 4000. HTTP GET to `/` through both `localhost` and `127.0.0.1` returned 200. The localhost response used HTML content type and contained the `Hello, angular-demo` heading, `ng-server-context="ssr"`, hydration annotations, and Angular state. A subsequent GET for the browser module referenced by that HTML returned 200 with JavaScript content type. The verification process was stopped after these checks; generated output and local captures remain outside version control.
 
 This establishes conventional Node.js SSR and browser asset delivery for the welcome application. The presence of hydration annotations does not establish successful browser hydration. Routed pages, a representative interaction, browser diagnostics, and performance measurement remain pending. The generated Node entrypoint uses `@angular/ssr/node`, Express, and Node APIs; it is not yet loadable through Rubicon's bare deno_core environment. AngularAppEngine remains an integration candidate requiring environment and module-loading work. See the [reference setup](../../examples/angular-demo/README.md). The runtime ADR remains Draft.
+
+### Angular Routes and Hydration Verification
+
+Later on 2026-10-10, the author replaced the welcome template with a shared root heading and RouterLink navigation, Home at `/`, and About at `/about`. Home owns a `signal(0)` and an increment button; the counter is a component instance value and is not persisted. The existing server catch-all remains configured with `RenderMode.Server`. The root-component tests now provide the router and assert the replacement heading.
+
+The following checks passed in the author's application directory:
+
+```text
+npm.cmd test -- --watch=false
+npm.cmd run build -- --configuration development
+```
+
+One test file ran two tests: root-component creation and heading rendering. These tests do not cover routed content, counter interaction, or hydration. The development build generated zero prerendered routes. A prior proposal check in a temporary copy also passed a production build and HTTP checks for both pages; this milestone's repository build and browser checks use development mode.
+
+Direct HTTP GET to `http://localhost:4000/` and `/about` returned 200 with HTML content type, the expected Home or About heading, and the SSR marker. The Home response contained the counter value zero before any browser script interaction.
+
+A fresh in-app browser tab loaded Home from the Node.js server. Its console reported `Angular hydrated 2 component(s) and 25 node(s)` with zero skipped components. Two increment clicks visibly changed the counter from 0 to 1 to 2. RouterLink navigation displayed About and changed the URL to `/about`. Reloading that URL retained About and produced a second hydration report with two components, 19 nodes, and zero skipped components. Returning through the Home link created a Home instance with counter zero. Captured warning and error logs were empty throughout this sequence.
+
+The [browser capture](../assets/angular-reference-counter.jpg) records Home after the two increment clicks. This is a correctness observation for the conventional Node.js development build, not performance evidence or retained browser regression automation. Counter reset on navigation does not establish isolation between server requests. Angular loading inside deno_core, equivalent browser delivery through Axum, native services, lifecycle guarantees, and performance remain pending. See the [application guide](../../examples/angular-demo/README.md#browser-hydration-check) and [runtime decision record](../adr/001-runtime-selection.md#angular-routes-and-hydration).
 
 ## Open Questions
 

@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** HTTP-to-JavaScript worker prototype and Node.js Angular SSR reference; Angular integration into Rubicon pending
+**Implementation:** HTTP-to-JavaScript worker prototype and Node.js Angular SSR/hydration reference; Angular integration into Rubicon pending
 
 ## Purpose and Context
 
@@ -17,7 +17,7 @@ The intended user is a developer building an Angular application who wants to ru
 
 The Rust prototype verifies JavaScript execution, runtime reuse, local ES module loading, and Axum routes invoking a persistent worker. The host forwards an owned request containing a generated string identifier, absolute URL, method, and repeated header pairs. The worker returns an owned response containing status, repeated headers, and a buffered body; the HTTP handler validates that response before delivery. The queue holds 16 waiting jobs with one active render. Automated checks cover admission rejection, identifiers without wrapping or JavaScript numeric precision loss, response metadata, Promise fulfillment and rejection, and continued execution after ordinary execution and conversion failures. Earlier HTTP checks also verify escaped request values and empty HEAD delivery. These checks do not establish request isolation or resource cleanup.
 
-The separate [reference application](../../examples/angular-demo/README.md) pins Angular 22.2.2 and runs on the generated Node.js server. Its production build succeeds, no route is prerendered, and HTTP checks receive the server-rendered welcome heading and matching browser JavaScript asset. The application does not yet consume Rubicon. Browser hydration, Angular compatibility with the embedded runtime, native services, and performance results remain pending. The [architecture](architecture.md), [rendering contract](rendering-contract.md), and [runtime ADR](../adr/001-runtime-selection.md) record the completed checks and their limits.
+The separate [reference application](../../examples/angular-demo/README.md) pins Angular 22.2.2 and runs on the generated Node.js server. The initial welcome application's production build and asset delivery passed. The routed application now has Home and About pages and a signal-based counter; its development build, two root-component tests, and direct SSR access passed. Browser checks verify hydration diagnostics, counter increments, navigation, and direct About reload without captured warnings or errors. Neither checked build prerenders routes. The application does not yet consume Rubicon. Angular compatibility with the embedded runtime, native services, isolation, and performance results remain pending. The [architecture](architecture.md), [rendering contract](rendering-contract.md), and [runtime ADR](../adr/001-runtime-selection.md) record the completed checks and their limits.
 
 ## Scope
 
@@ -98,8 +98,8 @@ For a fixed workload and resource budget, the primary optimization objective is 
 | Requirement | Verification method | Planned evidence | State |
 | --- | --- | --- | --- |
 | OV-01 | Inspect public boundaries and run the consuming example. | Reference application at `examples/angular-demo`; Rubicon consumption pending. | Partial: separate Node.js reference created; consuming adapter planned. |
-| OV-02, OV-04 | Check dynamic content, status, headers, redirects, and missing routes. | HTTP correctness checks. | Partial: structured prototype checks and Node.js Angular welcome SSR verified; Angular delivery through Rust planned. |
-| OV-03 | Open the SSR page and perform an interaction. | Browser hydration check. | Planned |
+| OV-02, OV-04 | Check dynamic content, status, headers, redirects, and missing routes. | HTTP correctness checks. | Partial: structured prototype checks and Node.js Angular SSR for two pages verified; Angular delivery through Rust planned. |
+| OV-03 | Open the SSR page and perform an interaction. | Browser hydration check. | Partial: Node.js reference hydration and counter interaction verified; repeat after Rubicon integration. |
 | OV-05 | Alternate request identities, exercise concurrency, and observe cleanup. | Isolation and sustained-operation records. | Planned |
 | OV-06 | Await a controlled native data operation. | Native-service integration check. | Planned |
 | OV-07 | Execute the benchmark protocol. | Versioned experiment record and raw artifacts. | Planned |

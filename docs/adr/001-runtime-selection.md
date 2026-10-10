@@ -198,6 +198,12 @@ On 2026-10-10, the author added a separate Angular 22.2.2 SSR application with e
 
 The generated Node entrypoint is a reference implementation for subsequent artifact and environment inspection. It does not prove execution inside deno_core, successful browser hydration, asynchronous native services, isolation, cleanup, or a performance improvement. This milestone selects the first Angular version to investigate but leaves the runtime decision and its acceptance conditions in Draft.
 
+### Angular Routes and Hydration
+
+Later on 2026-10-10, the Node.js reference application added Home and About pages, shared navigation, and a signal-based counter. The repository's two root-component tests and development build passed. Direct HTTP requests returned SSR content for both routes, and browser checks confirmed hydration diagnostics, counter increments, navigation, and direct About reload without captured warnings or errors. The [architecture evidence](../specs/architecture.md#angular-routes-and-hydration-verification) records the observations and the [application README](../../examples/angular-demo/README.md#browser-hydration-check) explains reproduction.
+
+This establishes a small Angular SSR and hydration reference on Node.js. It does not establish compatibility with the Rust-owned runtime. The same application must still pass after integration into deno_core, and native services, isolation, cleanup, and performance remain unverified. The runtime decision remains Draft.
+
 ## Decision History
 
 | Date | Change | Reason |
@@ -209,3 +215,4 @@ The generated Node entrypoint is a reference implementation for subsequent artif
 | 2026-10-09 | Record local ES module loading and HTML return values. | Verify loading once and calling the synchronous exported renderer twice through asynchronous Rust orchestration. |
 | 2026-10-10 | Record Promise-returning renderer checks. | Verify a local import, fulfillment, rejection after an awaited microtask, typed response conversion, and continued execution while keeping native I/O and Angular acceptance pending. |
 | 2026-10-10 | Record Angular 22.2.2 on the conventional Node.js server. | Establish a pinned application and verified SSR reference before embedded-runtime compatibility work. |
+| 2026-10-10 | Record routed pages, counter interaction, and Node.js reference hydration. | Establish observable browser behavior to repeat after embedded-runtime integration. |

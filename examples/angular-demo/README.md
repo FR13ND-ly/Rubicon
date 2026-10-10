@@ -1,13 +1,13 @@
 # Angular Reference Application
 
-**Status:** Initial SSR reference verified
+**Status:** Routed SSR and browser hydration reference verified
 **Created:** 2026-10-10
 **Last updated:** 2026-10-10
-**Implementation:** Angular SSR on Node.js; Rubicon integration and browser hydration verification pending
+**Implementation:** Angular SSR and browser hydration on Node.js; Rubicon integration pending
 
 ## Purpose
 
-This application provides a conventional Angular SSR reference for Rubicon's bachelor's thesis. It establishes a build and server-generated HTML before attempting to execute the Angular artifacts inside the Rust-owned runtime. It currently displays the generated Angular welcome page and does not consume the Rubicon library.
+This application provides a conventional Angular SSR reference for Rubicon's bachelor's thesis. It establishes server-generated HTML and browser hydration before attempting to execute the Angular artifacts inside the Rust-owned runtime. It contains Home at `/`, About at `/about`, shared navigation, and a signal-based counter on Home. It does not yet consume the Rubicon library.
 
 All direct Angular dependencies are pinned to 22.2.2. Commit package.json and package-lock.json together when dependencies change. The verified environment uses Node.js v24.19.0, npm 11.17.0, TypeScript 6.0.3, and Express 5.3.0. Resolved dependencies are recorded in package-lock.json; reproducibility of performance additionally requires a declared platform and workload.
 
@@ -26,15 +26,16 @@ Open `http://localhost:4000/`. From another terminal:
 
 ```powershell
 curl.exe -i http://localhost:4000/
+curl.exe -i http://localhost:4000/about
 ```
 
-The expected response is 200 with an HTML body containing `Hello, angular-demo`. The generated server uses port 4000 by default; its `PORT` environment variable can select another port. Stop the server with Ctrl+C. Rebuild and restart this server after changing application or build configuration.
+Both responses should be 200 with the `Rubicon demo` heading and the corresponding Home or About content. The Home HTML includes the counter value zero. The generated server uses port 4000 by default; its `PORT` environment variable can select another port. Stop the server with Ctrl+C. Rebuild and restart this server after changing application or build configuration.
 
 During development, `npm.cmd start` runs the separate Angular development server, normally on port 4200. A development-server check does not replace verification of the built Node.js entrypoint.
 
 ## Rendering and Artifacts
 
-`src/app/app.routes.server.ts` explicitly assigns `RenderMode.Server` to the catch-all route. `angular.json` uses the application builder and server output mode. The production build reports zero prerendered routes. This setup exercises server rendering for requests instead of serving a prerendered welcome page.
+`src/app/app.routes.ts` maps paths to the Home and About components. `src/app/app.routes.server.ts` explicitly assigns `RenderMode.Server` to the server catch-all route. `angular.json` uses the application builder and server output mode. The initial production build and the current development build reported zero prerendered routes. This setup exercises server rendering for requests.
 
 The build produces `dist/angular-demo/browser` and `dist/angular-demo/server`. The generated `src/server.ts` uses Express and AngularNodeAppEngine from `@angular/ssr/node`, serves the browser files, and delegates rendering to Angular. Its built entrypoint is `dist/angular-demo/server/server.mjs`.
 
@@ -46,20 +47,44 @@ These files are a reference for inspecting the artifact graph. The Node entrypoi
 
 ## Verification and Limits
 
-On 2026-10-10, `npm.cmd ls --depth=0` passed with all direct Angular packages installed at 22.2.2, matching the manifest and lock. `npm.cmd run build` passed with the default production configuration and generated no prerendered routes.
+At the initial welcome-page milestone on 2026-10-10, `npm.cmd ls --depth=0` passed with all direct Angular packages installed at 22.2.2, matching the manifest and lock. `npm.cmd run build` passed with the default production configuration and generated no prerendered routes.
 
 A temporary server process running that build on port 4107 returned 200 for `/` through both local hostnames. Its HTML contained the welcome heading, the SSR marker, hydration annotations, and Angular state. The browser JavaScript module referenced by the HTML also returned 200 with JavaScript content type. The verification process was stopped afterward. Build outputs, node_modules, and Angular caches are ignored by Git.
 
-These checks verify SSR content and asset delivery. Hydration annotations alone do not prove successful browser hydration. A routed example, representative interaction, browser diagnostics, request isolation, asynchronous native Rust data access, and performance measurements are still pending. The generated unit tests have not been run for this milestone. Installation used npm install during setup; the npm ci command above is the intended reproduction path and was not separately exercised in this verification.
+Those initial checks verified SSR content and asset delivery; browser hydration was pending at that milestone. Later on the same day, the routed application passed `npm.cmd test -- --watch=false` with two tests in one file and `npm.cmd run build -- --configuration development` with zero prerendered routes. Direct HTTP requests returned the expected SSR content for both pages. The existing tests cover the root component's creation and heading, while route and interaction evidence comes from the HTTP and browser checks below.
+
+Request isolation, asynchronous native Rust data access, Rust-hosted Angular rendering, and performance measurements remain pending. Installation used npm install during setup; the npm ci command above is the intended reproduction path and was not separately exercised in this verification.
 
 See the [architecture record](../../docs/specs/architecture.md#angular-nodejs-reference-verification) for the milestone evidence, the [runtime ADR](../../docs/adr/001-runtime-selection.md#angular-nodejs-reference) for acceptance conditions, and the [benchmark protocol](../../docs/specs/benchmark-protocol.md) before interpreting performance.
 
+## Browser Hydration Check
+
+For hydration diagnostics, stop a running server before rebuilding and use the development configuration:
+
+```powershell
+npm.cmd test -- --watch=false
+npm.cmd run build -- --configuration development
+npm.cmd run serve:ssr:angular-demo
+```
+
+1. Open Home directly and inspect the browser console for Angular's hydration statistics.
+2. Click Increment twice and observe counter values 1 and 2.
+3. Use the About link, then reload `/about` to check direct route loading and hydration.
+4. Return through the Home link; a new component instance starts with counter zero.
+5. Inspect the console for warnings and errors.
+
+The checked Home load reported two hydrated components and 25 nodes; the direct About reload reported two components and 19 nodes. Both reported zero skipped components. The counter and navigation behaved as described, and captured warning and error logs were empty. These node counts describe the current templates and may change with legitimate markup edits. The [architecture evidence](../../docs/specs/architecture.md#angular-routes-and-hydration-verification) records the full scope and limits.
+
+![Home after two increment clicks](../../docs/assets/angular-reference-counter.jpg)
+
+The screenshot records the Node.js development build after interaction. Browser hydration must be verified again when the application is hosted by Rubicon. Performance evaluation requires the declared production configuration and benchmark protocol.
+
 ## Next Steps
 
-1. Replace the welcome page with two routes and a small signal-based counter.
-2. Check direct HTTP access to both pages and verify hydration and interaction in the browser.
-3. Inspect the build's imports and manifests, then define the Angular adapter and required embedded APIs.
-4. Render the same application through Rubicon and serve its matching browser assets.
+1. Inspect the build's imports and manifests, then define the Angular adapter and required embedded APIs.
+2. Render the same application through Rubicon and serve its matching browser assets.
+3. Repeat HTTP, browser hydration, and interaction checks through the Rust host.
+4. Add native data access and lifecycle controls before performance evaluation.
 
 ## Sources
 
