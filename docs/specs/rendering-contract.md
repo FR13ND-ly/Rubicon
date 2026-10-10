@@ -3,13 +3,13 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-10
-**Implementation:** Partial URL-and-method request object; demonstration HEAD metadata verified; Angular adapter not implemented
+**Implementation:** URL, method, and text header pairs; demonstration HEAD metadata verified; Angular adapter not implemented
 
 ## Purpose and Context
 
 The rendering contract defines the boundary between the Rust HTTP host and the application's Angular renderer. It specifies request information, response outcomes, lifecycle responsibilities, and failure behavior.
 
-This is a semantic contract for the intended prototype. The current implementation passes an object containing URL and method to a JavaScript `render(request)` export and receives an HTML string. The complete Angular adapter's Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
+This is a semantic contract for the intended prototype. The current implementation passes an object containing URL, method, and text header pairs to a JavaScript `render(request)` export and receives an HTML string. The complete Angular adapter's Rust types, TypeScript exports, module names, and serialization representation remain TBD. A runtime adapter implements this contract for a particular engine.
 
 The intended boundary permits a future runtime replacement without changing application-facing request semantics. Engine lifecycle and integration work still belong to the replacement adapter.
 
@@ -51,13 +51,15 @@ AngularAppEngine is a candidate public integration point because its handle meth
 
 ### Implemented Request Object Boundary
 
-`Renderer::render(request: RenderRequest)` accepts an owned Rust request. The public [RenderRequest](../../crates/rubicon/src/request.rs) contains `url: String` and `method: String` and derives `serde::Serialize`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request`; the generic `JavaScriptRuntime::call_string_export<T: serde::Serialize>` converts it directly into a V8 object through `serde_v8::to_v8` and invokes the export through `call_with_args`. Values are not interpolated into JavaScript source. The module's `render(request)` export returns a string that the host delivers through Axum's `Html` response.
+`Renderer::render(request: RenderRequest)` accepts an owned Rust request. The public [RenderRequest](../../crates/rubicon/src/request.rs) contains `url: String`, `method: String`, and `headers: Vec<(String, String)>` and derives `serde::Serialize`. Each `RenderJob` owns that request and its own reply channel to the persistent worker. The worker borrows `job.request`; the generic `JavaScriptRuntime::call_string_export<T: serde::Serialize>` converts it directly into a V8 object through `serde_v8::to_v8` and invokes the export through `call_with_args`. Header pairs become JavaScript arrays. Values are not interpolated into JavaScript source. The module's `render(request)` export returns a string that the host delivers through Axum's `Html` response.
 
 GET handlers for `/` and `/{*path}` obtain `OriginalUri` and append its original path and query to the fixed application origin `http://127.0.0.1:3000`. The host does not decode or reconstruct query parameters. Source review confirms that request `Host` and forwarded headers are not used to construct this origin; header-spoofing behavior has not been separately exercised. Configurable origins, trusted proxies, and URL size and validation policies remain open.
 
 The handler also extracts the actual HTTP `Method` and stores its string form. For HEAD, the demonstration displays `GET` as the page method while retaining `HEAD` in the request object. The module escapes `&`, `<`, `>`, double quotes, and apostrophes when displaying the page method and URL as HTML text. Every matched GET or HEAD page path invokes the demonstration renderer; this does not implement Angular route matching, application 404 outcomes, or precedence for API and browser-asset paths.
 
-The job currently contains only URL and method from the request model. Repeated headers, request identifier, context, native services, and lifecycle controls remain to be added. A string result also does not implement the complete terminal-outcome and response-metadata models below. Axum omits the HEAD body, and the demonstration's Content-Length now matches the corresponding GET representation. Full RC-05 acceptance still requires the complete application response-metadata model.
+The handler extracts `HeaderMap` and converts each value into a separate name-value pair using `keys()` and `get_all()`. Repeated values remain separate and retain their per-name order; ordering across different names is unspecified. Names use their normalized lowercase form. Values rejected by `HeaderValue::to_str()` produce HTTP 400 before worker admission. This is a provisional supported-text policy, not a classification of every rejected value as invalid HTTP. Arbitrary valid header byte sequences remain unsupported. The demonstration displays only `x-rubicon-demo` values with HTML text escaping.
+
+The job currently contains URL, method, and header pairs from the request model. Request identifier, context, native services, and lifecycle controls remain to be added. A string result also does not implement the complete terminal-outcome and response-metadata models below. Axum omits the HEAD body, and the demonstration's Content-Length matches the corresponding GET representation. Full RC-05 acceptance still requires the complete application response-metadata model.
 
 ### Request Model
 
@@ -66,7 +68,7 @@ The job currently contains only URL and method from the request model. Repeated 
 | Request identifier | Correlates rendering, operations, and cleanup. | Generated by the host; unique among active requests. |
 | URL | Absolute application URL including query parameters. | Validated by the host; proxy-derived values require an explicit trust policy. |
 | Method | GET or HEAD for the initial page-rendering contract. | Validated before admission. |
-| Headers | Ordered collection of name-value pairs. | Must support repeated fields; a simple string map is insufficient. |
+| Headers | Collection of name-value pairs, retaining the order of values for the same name. | Must support repeated fields; ordering across different names is unspecified. The current prototype supports only values accepted by `HeaderValue::to_str()`. |
 | Context | Application metadata made available during this request. | JSON-compatible values with explicit size and field policy. |
 | Deadline and cancellation state | Controls how long work remains eligible. | Host-owned lifecycle controls; their runtime representation is adapter-specific. |
 
@@ -135,7 +137,7 @@ The benchmark must account for conversion and data-copy costs. Streaming would r
 
 | Requirement | Verification method | Planned evidence | State |
 | --- | --- | --- | --- |
-| RC-01 | Exercise query parameters, direct route access, methods, and repeated headers. | Request conversion checks. | Partial: URL path/query and GET/HEAD method transfer verified; headers and request identifier planned. |
+| RC-01 | Exercise query parameters, direct route access, methods, and repeated headers. | Request conversion checks. | Partial: URL path/query, GET/HEAD method, and repeated text-header transfer verified; request identifier planned and arbitrary header bytes unsupported. |
 | RC-02 | Alternate contexts and complete an operation after cancellation. | Request-scope checks. | Planned |
 | RC-03 | Exercise each terminal outcome and attempted late completion. | Outcome checks. | Planned |
 | RC-04 | Check status, redirects, Set-Cookie, and body content. | HTTP delivery checks. | Partial: successful 200 HTML delivery verified; application response metadata planned. |
@@ -163,6 +165,14 @@ At the request-object milestone, HTTP checks returned 200 HTML for GET, an empty
 Later on 2026-10-10, the author applied the demonstration's page-method adjustment. A repeated GET / HEAD / GET sequence returned 200 HTML metadata and Content-Length 111 for all three responses; HEAD delivered no body, and the GET counters were 3 and 5. The HEAD length matched the GET representation for the intervening counter value. A prior router check in a temporary copy also passed with the same adjustment, exact GET HTML, and an empty HEAD body. The [correction milestone](architecture.md#head-representation-metadata-correction) records the checks and their limits. The temporary test is not part of the repository suite.
 
 The actual request method remains available to JavaScript, including `HEAD`; the controlled worker fixture still checks that field. The demonstration now verifies body omission and its representation length. These checks do not establish complete RC-05 acceptance, request-context isolation, Angular compatibility, or performance gains.
+
+### Request Header Evidence
+
+On 2026-10-10, formatting, locked offline compilation for all targets, and the complete repository test command passed after completing the header changes. Two library tests, two executable header-conversion tests, and the standalone worker integration executable succeeded. The worker fixture still uses empty header lists and verifies URL/method association after its intentional errors.
+
+Actual HTTP GET / HEAD / GET checks with two `X-Rubicon-Demo` values returned 200 and Content-Length 163. GET displayed both escaped values in order and counters 1 and 3. HEAD reported the length of the corresponding GET representation. A prior router test in a temporary copy checked the same proposal's repeated values, empty HEAD body, unsupported-value 400, and continued execution without rendering the rejected request. That temporary test is not part of the repository suite. The [architecture milestone](architecture.md#request-header-verification) records commands, observations, and limitations.
+
+These checks support RC-01 for the current text-header policy. They do not verify user-context isolation, all valid HTTP header byte sequences, complete application response metadata, Angular compatibility, or performance gains.
 
 ## Open Questions
 

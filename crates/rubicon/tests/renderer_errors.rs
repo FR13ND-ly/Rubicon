@@ -62,6 +62,7 @@ async fn render(renderer: &Renderer, method: &str, url: &str) -> Result<String, 
     let request = RenderRequest {
         url: url.to_owned(),
         method: method.to_owned(),
+        headers: Vec::new(),
     };
 
     tokio::time::timeout(Duration::from_secs(5), renderer.render(request))

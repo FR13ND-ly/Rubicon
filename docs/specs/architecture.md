@@ -38,7 +38,7 @@ The current executable initializes the V8 platform on the main thread and starts
 
 Startup waits for a one-shot module-initialization result before binding the HTTP listener. This confirms runtime creation and module evaluation; the `render` export is checked when invoked, so this handshake does not establish full application rendering readiness.
 
-Axum stores a cloneable `Renderer` in application state. Handlers registered through `get` for `/` and `/{*path}` also receive HEAD requests. They extract `OriginalUri` and `Method`, combine the original path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest` containing URL and method. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request`, converts it directly into a V8 object through `serde_v8::to_v8`, and invokes the module's `render(request)` export. The result becomes a Rust string returned as buffered HTML; Axum omits the HEAD body.
+Axum stores a cloneable `Renderer` in application state. Handlers registered through `get` for `/` and `/{*path}` also receive HEAD requests. They extract `OriginalUri`, `Method`, and `HeaderMap`, combine the original path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest` containing URL, method, and header pairs. The host visits each name and all its values to preserve repeated fields, rejecting unsupported text values with HTTP 400 before dispatch. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request`, converts it directly into a V8 object through `serde_v8::to_v8`, and invokes the module's `render(request)` export. The result becomes a Rust string returned as buffered HTML; Axum omits the HEAD body.
 
 The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one job at a time. Submission uses `try_send`, so a full queue is rejected immediately rather than creating additional tasks waiting to enqueue. This bounds queued render jobs, not all HTTP connections or total process memory. The value is provisional and has not been tuned by benchmarks.
 
@@ -49,7 +49,7 @@ The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one 
 | Worker channel or reply channel closed | 503 with a generic unavailable response. |
 | Export execution or result conversion fails | 500 with a generic failure response; details are logged server-side. |
 
-The demonstration module displays URL and a page method using HTML text escaping and maintains a render counter to show engine and module persistence. For HEAD, the page method is `GET`, so the generated HTML describes the corresponding GET representation; the actual request method remains `HEAD`. A job currently carries only URL and method from the proposed request model. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. Empty HEAD delivery and demonstration Content-Length matching the GET representation are verified. The following Angular request flow remains a proposal.
+The demonstration module displays URL, a page method, and `x-rubicon-demo` header values using HTML text escaping and maintains a render counter to show engine and module persistence. For HEAD, the page method is `GET`, so the generated HTML describes the corresponding GET representation; the actual request method remains `HEAD`. A job currently carries URL, method, and header pairs from the proposed request model. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. Empty HEAD delivery and demonstration Content-Length matching the GET representation are verified. The following Angular request flow remains a proposal.
 
 ### Proposed Components
 
@@ -111,7 +111,7 @@ Angular remains responsible for matching application routes during rendering. Th
 | Worker to Angular adapter | Serializable request information and scoped service access | Response, no matching route, or failure | The worker reports the failure and cleans up. |
 | Adapter to native service | Request-scoped operation and arguments | Data or explicit error | Late results cannot affect a different request. |
 
-The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The demonstration currently uses `render(request)` with URL and method fields; configuration format, the complete Angular adapter interface, and service-operation names remain TBD.
+The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The demonstration currently uses `render(request)` with URL, method, and header-pair fields; configuration format, the complete Angular adapter interface, and service-operation names remain TBD.
 
 The initial response is buffered HTML. The matching browser artifacts must come from the same application build. Any HTML processing must preserve the structure and state required for hydration.
 
@@ -162,7 +162,7 @@ Snapshots are a later startup experiment. HTML caching is a separate serving sce
 | ARCH-04 | Offer work above capacity and inspect admission and queue counts. | Scheduler checks and overload run. | Partial: controlled queue rejection verified; configured scheduling and HTTP overload planned. |
 | ARCH-05 | Alternate identities and verify cleanup after successful and failed renders. | Isolation checks and sustained-operation run. | Planned |
 | ARCH-06 | Exercise service success, failure, and late completion. | Native-service integration checks. | Planned |
-| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: URL/method propagation, successful HTML delivery, HEAD body omission, and demonstration HEAD representation length verified; complete response contract planned. |
+| ARCH-07 | Verify HTTP delivery against the rendering contract. | Contract checks. | Partial: URL/method and repeated-header propagation, successful HTML delivery, HEAD body omission, and demonstration HEAD representation length verified; complete response contract planned. |
 | ARCH-08 | Disconnect clients, expire deadlines, and initiate shutdown. | Cancellation and recovery checks. | Partial: continued execution after ordinary renderer errors verified; cancellation and shutdown planned. |
 
 ### Initial HTTP Host Verification
@@ -309,6 +309,36 @@ All three responses returned 200 and `Content-Type: text/html; charset=utf-8`. G
 The diagnostic counter makes the page dynamic: its length increases when the number of digits grows. A HEAD comparison must therefore use the corresponding GET representation for that render, rather than assume that all successive GET responses have equal lengths. The integration fixture continues to echo the actual `HEAD` method independently of the demonstration's page method.
 
 These checks resolve the demonstration's one-byte mismatch. They do not establish complete application status and header preservation, redirects, repeated Set-Cookie fields, Angular compatibility, or performance gains. The full Rust suite was not repeated for this JavaScript-only correction; the earlier request-object milestone records its results and the existing LNK4098 warning.
+
+### Request Header Verification
+
+Later on 2026-10-10, `RenderRequest` gained `headers: Vec<(String, String)>`. The handler extracts `HeaderMap`, visits each name and its `get_all` values, and creates owned string pairs. Serde converts these pairs into JavaScript arrays through the existing runtime helper. Values for the same name remain separate and retain their order; ordering across different names is unspecified. Names use `HeaderName::as_str()` normalization. Values rejected by `HeaderValue::to_str()` produce 400 before a render job is submitted. This provisional text policy does not support all valid HTTP header bytes.
+
+The demonstration now displays only `x-rubicon-demo` values in an HTML list, using the existing escaping function. The author applied the header changes; completing them required removal of an extra import comma and addition of empty header lists to both queue-test request constructors. The integration helper also constructs an empty header list. Two executable unit tests check repeated values interleaved with another header name and rejection of the valid HTTP byte value `0xff`, which is unsupported by the text policy.
+
+The following repository checks passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+Two library tests and two executable unit tests passed; the standalone worker integration target printed `Renderer request and error checks passed.` Its controlled fixture still verifies URL/method association and continued execution after errors, using empty header lists. Linker warning LNK4098 persists. Incremental-cache hard-link warnings reported a fallback to copying; both Cargo commands completed successfully.
+
+A prior check of the same header proposal in a temporary copy passed a router test covering empty headers, repeated values, escaped HTML, HEAD delivery and representation length, unsupported-value HTTP 400, and a subsequent successful render. It also checked that the rejected request did not advance the module counter. Tower and that router test remained confined to the temporary copy.
+
+For actual HTTP verification, the corrected executable was started temporarily on `127.0.0.1:3000` and stopped after the checks. The following sequence was used:
+
+```text
+curl.exe -i -H "X-Rubicon-Demo: alpha&beta" -H "X-Rubicon-Demo: <two>" "http://127.0.0.1:3000/products?sort=asc&page=2"
+curl.exe -I -H "X-Rubicon-Demo: alpha&beta" -H "X-Rubicon-Demo: <two>" "http://127.0.0.1:3000/products?sort=asc&page=2"
+curl.exe -i -H "X-Rubicon-Demo: alpha&beta" -H "X-Rubicon-Demo: <two>" "http://127.0.0.1:3000/products?sort=asc&page=2"
+```
+
+All three responses returned 200, the HTML content type, and Content-Length 163. GET returned counters 1 and 3 and the exact list `<ul><li>alpha&amp;beta</li><li>&lt;two&gt;</li></ul>`. HEAD returned only headers through curl's HEAD mode, with length matching the GET representation for counter 2. Empty HEAD body delivery was also checked by the earlier temporary router test.
+
+These checks verify the repeated-header boundary for supported text values. Request identity, context isolation, arbitrary header bytes, complete response outcomes, Angular SSR, lifecycle guarantees, and performance measurements remain future work. No dependency was added in this milestone.
 
 ## Open Questions
 

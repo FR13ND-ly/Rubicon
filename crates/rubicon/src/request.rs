@@ -2,4 +2,5 @@
 pub struct RenderRequest {
     pub url: String,
     pub method: String,
+    pub headers: Vec<(String, String)>,
 }

@@ -3,7 +3,7 @@ use std::path::Path;
 use axum::{
     Router,
     extract::{OriginalUri, State},
-    http::{Method, StatusCode},
+    http::{HeaderMap, Method, StatusCode},
     response::Html,
     routing::get,
 };
@@ -41,6 +41,7 @@ async fn root(
     State(renderer): State<Renderer>,
     OriginalUri(uri): OriginalUri,
     method: Method,
+    headers: HeaderMap,
 ) -> Result<Html<String>, (StatusCode, &'static str)> {
     let path_and_query = uri
         .path_and_query()
@@ -51,6 +52,7 @@ async fn root(
     let request = RenderRequest {
         url,
         method: method.as_str().to_owned(),
+        headers: request_headers(&headers)?,
     };
 
     match renderer.render(request).await {
@@ -67,5 +69,63 @@ async fn root(
 
             Err((StatusCode::INTERNAL_SERVER_ERROR, "Rendering failed."))
         }
+    }
+}
+
+fn request_headers(
+    headers: &HeaderMap,
+) -> Result<Vec<(String, String)>, (StatusCode, &'static str)> {
+    let mut pairs = Vec::with_capacity(headers.len());
+
+    for name in headers.keys() {
+        for value in headers.get_all(name) {
+            let value = value
+                .to_str()
+                .map_err(|_| (StatusCode::BAD_REQUEST, "Unsupported request header value."))?;
+
+            pairs.push((name.as_str().to_owned(), value.to_owned()));
+        }
+    }
+
+    Ok(pairs)
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::{HeaderMap, HeaderValue, StatusCode};
+
+    use super::request_headers;
+
+    #[test]
+    fn request_headers_preserve_repeated_values() {
+        let mut headers = HeaderMap::new();
+        headers.append("x-rubicon-demo", HeaderValue::from_static("first"));
+        headers.append("accept", HeaderValue::from_static("text/html"));
+        headers.append("x-rubicon-demo", HeaderValue::from_static("second"));
+
+        let pairs = request_headers(&headers).expect("Header conversion failed");
+        let repeated: Vec<&str> = pairs
+            .iter()
+            .filter(|(name, _)| name == "x-rubicon-demo")
+            .map(|(_, value)| value.as_str())
+            .collect();
+
+        assert_eq!(pairs.len(), 3);
+        assert_eq!(repeated, vec!["first", "second"]);
+        assert!(pairs.contains(&("accept".to_owned(), "text/html".to_owned())));
+    }
+
+    #[test]
+    fn request_headers_reject_unsupported_text_values() {
+        let mut headers = HeaderMap::new();
+        headers.append(
+            "x-rubicon-demo",
+            HeaderValue::from_bytes(b"\xff").expect("Valid HTTP header bytes"),
+        );
+
+        assert_eq!(
+            request_headers(&headers),
+            Err((StatusCode::BAD_REQUEST, "Unsupported request header value.")),
+        );
     }
 }

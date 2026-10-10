@@ -128,6 +128,7 @@ mod tests {
             let request = RenderRequest {
                 url: "http://127.0.0.1:3000/test".to_owned(),
                 method: "GET".to_owned(),
+                headers: Vec::new(),
             };
             let (reply, response) = oneshot::channel();
 
@@ -145,6 +146,7 @@ mod tests {
             renderer.render(RenderRequest {
                 url: "http://127.0.0.1:3000/test".to_owned(),
                 method: "GET".to_owned(),
+                headers: Vec::new(),
             }),
         )
         .await
