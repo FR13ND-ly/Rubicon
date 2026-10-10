@@ -2,7 +2,7 @@
 
 **Status:** Draft
 **Created:** 2026-10-09
-**Last updated:** 2026-10-10
+**Last updated:** 2026-10-11
 **Implementation:** HTTP-to-JavaScript worker prototype and Node.js Angular SSR/hydration reference; Angular integration into Rubicon pending
 
 ## Purpose and Context
@@ -544,6 +544,8 @@ Repository formatting verification, locked offline compilation for all targets, 
 This verifies selected Web objects and their body behavior in the current worker. Request.url is canonicalized while the owned Rust request retains its original URL text. Native networking, public fetch, request body delivery from Axum, host cancellation, Angular handler execution, and performance remain pending. Rust still transports a buffered String response.
 
 ## Open Questions
+
+The [performance/Angular experiment](../experiments/003-performance-angular-render.md) verified the next bootstrap proposal in a temporary copy of `49709a9`. Angular's first lazy application import required the missing performance global. Initializing Deno's performance object enabled five sequential worker calls: Home, About, a mapped unknown route, repeated Home, and a HEAD representation, all accepted by the existing response converter. Eight library tests, four executable tests, and six fixtures passed in the copy. The repository still lacks this bootstrap addition and adapter; HTTP delivery of Angular, browser assets, hydration, and lifecycle acceptance remain pending.
 
 | Question | Impact | Next action |
 | --- | --- | --- |

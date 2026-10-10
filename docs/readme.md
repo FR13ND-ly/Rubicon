@@ -31,6 +31,8 @@ Update this index when document status changes or new documents are added.
 
 ## Experiments
 
+- [003: Performance API and first embedded Angular render](experiments/003-performance-angular-render.md), Completed temporary correctness check; author implementation pending. A real Deno performance object enabled Home/About SSR through the Rust worker, a controlled 404, and a HEAD representation. Six fixtures passed in the copy. HTTP delivery, browser hydration through Rubicon, and performance measurement remain pending.
+
 - [002: Web Request and Response objects](experiments/002-web-fetch-objects.md), Completed temporary correctness check with verified repository implementation. Pinned Deno extensions and a fifth worker fixture passed selected Request/Response semantics, cookie separation, and split UTF-8 body decoding. No network or Angular handler was invoked in this experiment.
 
 - [001: Angular neutral bundle compatibility](experiments/001-angular-runtime-compatibility.md), Completed exploratory check with a verified repository follow-up: the neutral build's module loaded in bare deno_core, while actual embedded rendering and required Web API support remain pending. This is correctness evidence, not a performance benchmark.
