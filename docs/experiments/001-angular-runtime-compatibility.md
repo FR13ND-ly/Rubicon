@@ -190,6 +190,62 @@ The author applied the URL/UTF-8 proposal to the actual crate, starting from com
 
 On 2026-10-10, repository formatting verification, locked offline compilation for all targets, and the full locked offline test command passed. Eight library tests, four executable tests, and both renderer fixtures passed, with one ignored macro-generated documentation example. The commands and scope are recorded in the [architecture milestone](../specs/architecture.md#url-and-utf8-runtime-verification). LNK4098 remains. This implements four selected Web globals; public timers, other Web API families, actual embedded Angular rendering, and performance remain pending.
 
+## Web Timers Prototype
+
+A temporary copy of the Web foundation sources committed as `58f331c` checked the next proposal: exposing setTimeout, clearTimeout, setInterval, and clearInterval from the pinned `ext:deno_web/02_timers.js` through the existing bootstrap. No dependency or worker change was needed. The registered deno_web extension already supplies the underlying operations; this proposal adds the four public globals.
+
+The copy added `tests/fixtures/renderer_timers.mjs` and included it as the third module in the existing integration executable, retaining a fresh worker for each fixture. The exact proposed fixture was:
+
+```javascript
+import { render as renderSync } from "./renderer_errors.mjs";
+
+export async function render(request) {
+    let cancelledTimerFired = false;
+    const cancelledTimer = setTimeout(() => {
+        cancelledTimerFired = true;
+    }, 0);
+    clearTimeout(cancelledTimer);
+
+    let ticks = 0;
+
+    await new Promise((resolve) => {
+        const interval = setInterval(() => {
+            ticks += 1;
+            if (ticks === 2) {
+                clearInterval(interval);
+                resolve();
+            }
+        }, 1);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    if (cancelledTimerFired) {
+        throw new Error("A cancelled timeout executed");
+    }
+    if (ticks !== 2) {
+        throw new Error("A cleared interval kept executing");
+    }
+
+    return renderSync(request);
+}
+
+```
+
+Each of the existing five integration calls now awaited actual timer callbacks before delegating to the response/error fixture. A zero-delay timeout was cancelled immediately and must not fire. The interval had to invoke its callback twice and then stop; the later five-millisecond timeout provided an observation window in which an incorrect clear operation could be detected. These delays are inputs for a correctness check, not latency or timer-precision measurements.
+
+The temporary copy used these commands:
+
+```text
+cargo fmt --manifest-path <copy>/Cargo.toml
+cargo check --locked --offline --manifest-path <copy>/Cargo.toml --all-targets --target-dir C:/Users/motri/Desktop/rubicon/crates/rubicon/target
+cargo test --locked --offline --manifest-path <copy>/Cargo.toml --target-dir C:/Users/motri/Desktop/rubicon/crates/rubicon/target
+```
+
+Formatting, locked offline all-target compilation, and the full locked offline test command passed in the copy, using the repository's ignored target directory. Eight library tests, four executable tests, and all three fixture success messages passed. The new fixture preserved the existing response comparisons, Promise rejection on call 2, body-conversion failure on call 4, and valid subsequent calls. One macro-generated documentation example was ignored, and LNK4098 persisted. The temporary package used the name `rubicon-timer-probe` with library name `rubicon` and corresponding root lockfile rename so it did not replace the normal executable. Its directories were removed; the full local output remains in ignored `crates/rubicon/target/timer-foundation-probe.log`.
+
+This is a verified proposal awaiting author implementation. It checks timer fulfillment and explicit JavaScript timer cancellation within controlled renders. It does not establish request cancellation, general cleanup of application timers, interruption of blocking JavaScript, HTTP deadline behavior, streams, Fetch objects, Angular rendering, or performance.
+
 ## Sources
 
 - [Angular non-Node SSR configuration](https://angular.dev/guide/ssr#non-nodejs), checked on 2026-10-10.

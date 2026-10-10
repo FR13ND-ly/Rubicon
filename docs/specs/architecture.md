@@ -515,6 +515,8 @@ Eight library tests and four executable unit tests passed, and both renderer fix
 
 ## Open Questions
 
+The [temporary Web timers check](../experiments/001-angular-runtime-compatibility.md#web-timers-prototype) verified a proposal exposing four timer globals and adding an integration fixture that awaits callbacks, cancels a timeout, and stops an interval. It passed the current response/error sequence through a worker without changing scheduling code. The proposal is not yet applied to the repository; the implemented runtime still exposes the four URL/encoding globals listed above.
+
 | Question | Impact | Next action |
 | --- | --- | --- |
 | Which generated Angular entrypoint and manifests are required? | Defines the artifact-loading integration. | Use the implemented neutral build and verify lazy bootstrap and asset imports during embedded rendering. |
