@@ -11,5 +11,5 @@ export function render(request) {
         return { invalid: true };
     }
 
-    return `<p>Render ${renderCount}</p><p>Method: ${request.method}</p><p>URL: ${request.url}</p>`;
+    return `<p>Request ID: ${request.request_id}</p><p>Render ${renderCount}</p><p>Method: ${request.method}</p><p>URL: ${request.url}</p>`;
 }

@@ -38,18 +38,19 @@ The current executable initializes the V8 platform on the main thread and starts
 
 Startup waits for a one-shot module-initialization result before binding the HTTP listener. This confirms runtime creation and module evaluation; the `render` export is checked when invoked, so this handshake does not establish full application rendering readiness.
 
-Axum stores a cloneable `Renderer` in application state. Handlers registered through `get` for `/` and `/{*path}` also receive HEAD requests. They extract `OriginalUri`, `Method`, and `HeaderMap`, combine the original path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest` containing URL, method, and header pairs. The host visits each name and all its values to preserve repeated fields, rejecting unsupported text values with HTTP 400 before dispatch. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request`, converts it directly into a V8 object through `serde_v8::to_v8`, and invokes the module's `render(request)` export. The result becomes a Rust string returned as buffered HTML; Axum omits the HEAD body.
+Axum stores a cloneable `Renderer` in application state. Handlers registered through `get` for `/` and `/{*path}` also receive HEAD requests. They extract `OriginalUri`, `Method`, and `HeaderMap`, combine the original path and query with the fixed origin `http://127.0.0.1:3000`, and construct an owned `RenderRequest` containing a string identifier, URL, method, and header pairs. A process-local atomic counter generates the identifier before header conversion; checked increment rejects exhaustion without wrapping. Client headers do not select this identifier. The host visits each name and all its values to preserve repeated fields, rejecting unsupported text values with HTTP 400 before dispatch. Each `RenderJob` carries this request and its own `oneshot` reply through the bounded Tokio `mpsc` channel. The worker borrows `job.request`, converts it directly into a V8 object through `serde_v8::to_v8`, and invokes the module's `render(request)` export. The result becomes a Rust string returned as buffered HTML; Axum omits the HEAD body.
 
 The queue capacity is hardcoded to 16 waiting jobs, and the worker executes one job at a time. Submission uses `try_send`, so a full queue is rejected immediately rather than creating additional tasks waiting to enqueue. This bounds queued render jobs, not all HTTP connections or total process memory. The value is provisional and has not been tuned by benchmarks.
 
 | Current outcome | HTTP behavior |
 | --- | --- |
 | String returned by `render` | 200 with HTML content type; GET delivers the returned body and HEAD omits it. |
+| Request identifier counter exhausted | 503 before header conversion or worker submission; counter remains exhausted. |
 | Queue full | 503 with a generic busy response. |
 | Worker channel or reply channel closed | 503 with a generic unavailable response. |
 | Export execution or result conversion fails | 500 with a generic failure response; details are logged server-side. |
 
-The demonstration module displays URL, a page method, and `x-rubicon-demo` header values using HTML text escaping and maintains a render counter to show engine and module persistence. For HEAD, the page method is `GET`, so the generated HTML describes the corresponding GET representation; the actual request method remains `HEAD`. A job currently carries URL, method, and header pairs from the proposed request model. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. Empty HEAD delivery and demonstration Content-Length matching the GET representation are verified. The following Angular request flow remains a proposal.
+The demonstration module displays the request identifier, URL, a page method, and `x-rubicon-demo` header values using HTML text escaping and maintains a render counter to show engine and module persistence. For HEAD, the page method is `GET`, so the generated HTML describes the corresponding GET representation; the actual request method remains `HEAD`. A job currently carries identifier, URL, method, and header pairs from the proposed request model. The identifier is unique within one server execution and resets on restart; library callers supply their own identifier. Rendering-failure logs include the HTTP host's generated identifier. Retaining this diagnostic counter and returning the current fields do not verify isolation of user data or request cleanup. Empty HEAD delivery and demonstration Content-Length matching the GET representation are verified. The following Angular request flow remains a proposal.
 
 ### Proposed Components
 
@@ -111,7 +112,7 @@ Angular remains responsible for matching application routes during rendering. Th
 | Worker to Angular adapter | Serializable request information and scoped service access | Response, no matching route, or failure | The worker reports the failure and cleans up. |
 | Adapter to native service | Request-scoped operation and arguments | Data or explicit error | Late results cannot affect a different request. |
 
-The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The demonstration currently uses `render(request)` with URL, method, and header-pair fields; configuration format, the complete Angular adapter interface, and service-operation names remain TBD.
+The [rendering contract](rendering-contract.md) owns field definitions, response outcomes, and failure semantics. The demonstration currently uses `render(request)` with string identifier, URL, method, and header-pair fields; configuration format, the complete Angular adapter interface, and service-operation names remain TBD.
 
 The initial response is buffered HTML. The matching browser artifacts must come from the same application build. Any HTML processing must preserve the structure and state required for hydration.
 
@@ -339,6 +340,28 @@ curl.exe -i -H "X-Rubicon-Demo: alpha&beta" -H "X-Rubicon-Demo: <two>" "http://1
 All three responses returned 200, the HTML content type, and Content-Length 163. GET returned counters 1 and 3 and the exact list `<ul><li>alpha&amp;beta</li><li>&lt;two&gt;</li></ul>`. HEAD returned only headers through curl's HEAD mode, with length matching the GET representation for counter 2. Empty HEAD body delivery was also checked by the earlier temporary router test.
 
 These checks verify the repeated-header boundary for supported text values. Request identity, context isolation, arbitrary header bytes, complete response outcomes, Angular SSR, lifecycle guarantees, and performance measurements remain future work. No dependency was added in this milestone.
+
+### Request Identifier Verification
+
+Later on 2026-10-10, `RenderRequest` gained `request_id: String`. The HTTP handler uses a process-local `AtomicU64` initialized to 1 and `try_update` with `checked_add` and relaxed ordering. A successful update returns the previous value as a decimal string. The last emitted value is `u64::MAX - 1`; reaching `u64::MAX` leaves the counter unchanged on subsequent attempts and produces HTTP 503. This avoids reusing identifiers through overflow. Restarting the process resets the counter, so identifiers are not globally unique. Direct library callers remain responsible for identifiers they supply.
+
+The identifier is allocated before header conversion and worker admission. Rejected header requests therefore consume an identifier without rendering. The client-supplied `X-Request-ID` is still an ordinary forwarded header and cannot replace `request.request_id`. A clone retained by the HTTP handler adds the identifier to rendering-failure logs. The demonstration displays it using HTML text escaping. There is no response identifier header or identifier middleware for requests rejected outside the page handler.
+
+The following repository checks passed:
+
+```text
+cargo fmt --manifest-path crates/rubicon/Cargo.toml -- --check
+cargo check --locked --offline --manifest-path crates/rubicon/Cargo.toml --all-targets
+cargo test --locked --offline --manifest-path crates/rubicon/Cargo.toml
+```
+
+Two library tests and four executable unit tests passed. The two added unit tests generate 256 distinct identifiers across four threads and verify repeated exhaustion attempts without counter wrapping. The standalone integration target printed `Renderer request ID and error checks passed.` Successful calls preserved identifiers `9007199254740993`, `test-3`, and `9007199254740995` with the existing URL/method cases and render counters 1, 3, and 5. The decimal identifiers exceed JavaScript's safe integer range and remain exact because they cross the boundary as strings. The fixture's two intentional errors still permit later successful calls. Linker warning LNK4098 and incremental-cache copying warnings persist; compilation and tests completed successfully. No dependency was added.
+
+For actual HTTP verification, a temporary instance of the compiled executable was started on `127.0.0.1:3000` and stopped after checking it. GET / HEAD / GET requests included `X-Request-ID: client-supplied-id` and the repeated demonstration values `alpha&beta` and `<two>`. The host generated identifiers 1, 2, and 3 independently of that header. All responses returned 200 with HTML content type and Content-Length 183 for the corresponding single-digit representations; GET bodies matched the exact expected escaped HTML and counters 1 and 3. Curl's HEAD mode returned headers with the representation length for identifier 2 and counter 2.
+
+A raw HTTP request containing the unsupported header byte `0xff` returned 400 with `Unsupported request header value.` The following GET displayed identifier 5 and render counter 4, verifying that the rejected request consumed identifier 4 without entering the renderer. A prior proposal check in a temporary copy also verified the empty HEAD body at the router boundary. That router test and its direct Tower dependency are not retained in the repository.
+
+These checks establish process-local identifier generation and exact string transfer through the worker. They do not establish authentication, request-context isolation, cleanup, complete response outcomes, Angular SSR, or performance improvements. Performance remains unmeasured.
 
 ## Open Questions
 

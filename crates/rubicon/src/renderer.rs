@@ -126,6 +126,7 @@ mod tests {
 
         for _ in 0..QUEUE_CAPACITY {
             let request = RenderRequest {
+                request_id: "queue-test".to_owned(),
                 url: "http://127.0.0.1:3000/test".to_owned(),
                 method: "GET".to_owned(),
                 headers: Vec::new(),
@@ -144,6 +145,7 @@ mod tests {
         let result = tokio::time::timeout(
             Duration::from_secs(2),
             renderer.render(RenderRequest {
+                request_id: "queue-test".to_owned(),
                 url: "http://127.0.0.1:3000/test".to_owned(),
                 method: "GET".to_owned(),
                 headers: Vec::new(),

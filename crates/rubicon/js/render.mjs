@@ -9,7 +9,7 @@ export function render(request) {
         .map(([, value]) => `<li>${escapeHtml(value)}</li>`)
         .join("");
 
-    return `<h1>Rubicon</h1><p>Method: ${escapeHtml(pageMethod)}</p><p>URL: ${escapeHtml(request.url)}</p><p>Render ${renderCount}</p><ul>${demoHeaders}</ul>`;
+    return `<h1>Rubicon</h1><p>Request ID: ${escapeHtml(request.request_id)}</p><p>Method: ${escapeHtml(pageMethod)}</p><p>URL: ${escapeHtml(request.url)}</p><p>Render ${renderCount}</p><ul>${demoHeaders}</ul>`;
 }
 
 function escapeHtml(value) {

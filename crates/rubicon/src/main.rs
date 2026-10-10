@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use axum::{
     Router,
@@ -10,6 +13,7 @@ use axum::{
 use rubicon::{RenderError, RenderRequest, Renderer};
 
 const APPLICATION_ORIGIN: &str = "http://127.0.0.1:3000";
+static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -49,7 +53,10 @@ async fn root(
         .unwrap_or("/");
 
     let url = format!("{APPLICATION_ORIGIN}{path_and_query}");
+    let request_id = next_request_id(&NEXT_REQUEST_ID)?;
+
     let request = RenderRequest {
+        request_id: request_id.clone(),
         url,
         method: method.as_str().to_owned(),
         headers: request_headers(&headers)?,
@@ -65,7 +72,7 @@ async fn root(
         }
 
         Err(RenderError::Failed(error)) => {
-            eprintln!("Rendering failed: {error}");
+            eprintln!("Rendering failed [request_id={request_id}]: {error}");
 
             Err((StatusCode::INTERNAL_SERVER_ERROR, "Rendering failed."))
         }
@@ -90,11 +97,30 @@ fn request_headers(
     Ok(pairs)
 }
 
+fn next_request_id(counter: &AtomicU64) -> Result<String, (StatusCode, &'static str)> {
+    counter
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            value.checked_add(1)
+        })
+        .map(|value| value.to_string())
+        .map_err(|_| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Request identifiers exhausted.",
+            )
+        })
+}
+
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::HashSet,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
     use axum::http::{HeaderMap, HeaderValue, StatusCode};
 
-    use super::request_headers;
+    use super::{next_request_id, request_headers};
 
     #[test]
     fn request_headers_preserve_repeated_values() {
@@ -127,5 +153,51 @@ mod tests {
             request_headers(&headers),
             Err((StatusCode::BAD_REQUEST, "Unsupported request header value.")),
         );
+    }
+
+    #[test]
+    fn request_ids_are_unique_across_threads() {
+        let counter = AtomicU64::new(1);
+
+        let identifiers = std::thread::scope(|scope| {
+            let workers: Vec<_> = (0..4)
+                .map(|_| {
+                    scope.spawn(|| {
+                        (0..64)
+                            .map(|_| next_request_id(&counter).expect("ID generation failed"))
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+
+            workers
+                .into_iter()
+                .flat_map(|worker| worker.join().expect("ID worker panicked"))
+                .collect::<HashSet<_>>()
+        });
+
+        assert_eq!(identifiers.len(), 256);
+    }
+
+    #[test]
+    fn request_ids_do_not_wrap_after_exhaustion() {
+        let counter = AtomicU64::new(u64::MAX - 1);
+
+        assert_eq!(
+            next_request_id(&counter).expect("Last available ID failed"),
+            (u64::MAX - 1).to_string(),
+        );
+
+        for _ in 0..2 {
+            assert_eq!(
+                next_request_id(&counter),
+                Err((
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Request identifiers exhausted."
+                )),
+            );
+        }
+
+        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
     }
 }

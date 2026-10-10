@@ -17,13 +17,15 @@ async fn main() -> Result<(), String> {
     let second_url = "http://127.0.0.1:3000/search?q='quoted'&page=1";
 
     assert_eq!(
-        render(&renderer, "GET", first_url)
+        render(&renderer, "9007199254740993", "GET", first_url)
             .await
             .expect("First render failed"),
-        format!("<p>Render 1</p><p>Method: GET</p><p>URL: {first_url}</p>"),
+        format!(
+            "<p>Request ID: 9007199254740993</p><p>Render 1</p><p>Method: GET</p><p>URL: {first_url}</p>"
+        ),
     );
 
-    match render(&renderer, "GET", second_url).await {
+    match render(&renderer, "test-2", "GET", second_url).await {
         Err(RenderError::Failed(message)) => {
             assert!(message.starts_with("Export execution failed:"));
             assert!(message.contains("intentional renderer test error"));
@@ -32,13 +34,15 @@ async fn main() -> Result<(), String> {
     }
 
     assert_eq!(
-        render(&renderer, "HEAD", second_url)
+        render(&renderer, "test-3", "HEAD", second_url)
             .await
             .expect("Render after exception failed"),
-        format!("<p>Render 3</p><p>Method: HEAD</p><p>URL: {second_url}</p>"),
+        format!(
+            "<p>Request ID: test-3</p><p>Render 3</p><p>Method: HEAD</p><p>URL: {second_url}</p>"
+        ),
     );
 
-    match render(&renderer, "HEAD", first_url).await {
+    match render(&renderer, "test-4", "HEAD", first_url).await {
         Err(RenderError::Failed(message)) => {
             assert!(message.starts_with("String conversion failed:"));
         }
@@ -46,20 +50,28 @@ async fn main() -> Result<(), String> {
     }
 
     assert_eq!(
-        render(&renderer, "GET", first_url)
+        render(&renderer, "9007199254740995", "GET", first_url)
             .await
             .expect("Render after conversion error failed"),
-        format!("<p>Render 5</p><p>Method: GET</p><p>URL: {first_url}</p>"),
+        format!(
+            "<p>Request ID: 9007199254740995</p><p>Render 5</p><p>Method: GET</p><p>URL: {first_url}</p>"
+        ),
     );
 
     drop(renderer);
 
-    println!("Renderer request and error checks passed.");
+    println!("Renderer request ID and error checks passed.");
     Ok(())
 }
 
-async fn render(renderer: &Renderer, method: &str, url: &str) -> Result<String, RenderError> {
+async fn render(
+    renderer: &Renderer,
+    request_id: &str,
+    method: &str,
+    url: &str,
+) -> Result<String, RenderError> {
     let request = RenderRequest {
+        request_id: request_id.to_owned(),
         url: url.to_owned(),
         method: method.to_owned(),
         headers: Vec::new(),
