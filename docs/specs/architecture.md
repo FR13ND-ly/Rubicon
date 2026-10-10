@@ -553,6 +553,8 @@ Repository formatting verification, locked offline compilation for all targets, 
 
 The [performance/Angular experiment](../experiments/003-performance-angular-render.md) verified Angular rendering in a temporary copy of `49709a9`. Angular's first lazy application import required the missing performance global. Initializing Deno's performance object enabled five sequential worker calls: Home, About, a mapped unknown route, repeated Home, and a HEAD representation, all accepted by the existing response converter. Eight library tests, four executable tests, and six fixtures passed in the copy. The performance bootstrap and fixture are now verified in the repository. The Angular adapter, HTTP delivery of Angular, browser assets, hydration, and lifecycle acceptance remain pending.
 
+The subsequent [HTTP adapter experiment](../experiments/004-angular-http-adapter.md), based on `15f085c`, rebuilt a TypeScript render export and selected its generated module in a temporary Rust executable. Real HTTP checks verified Home/About SSR, the 404 fallback, query routing, and an empty HEAD response with Content-Length matching GET. Existing Rust tests and all six fixtures passed. The HTML's browser script returned 404. The two source edits are checked proposals awaiting author implementation; static asset service and browser hydration are the next steps after repository verification.
+
 | Question | Impact | Next action |
 | --- | --- | --- |
 | Which generated Angular entrypoint and manifests are required? | Defines the artifact-loading integration. | Use the implemented neutral build and verify lazy bootstrap and asset imports during embedded rendering. |

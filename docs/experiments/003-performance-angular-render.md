@@ -263,7 +263,7 @@ Eight library tests, four executable tests, and all six integration fixtures pas
 
 ## Author's Next Step
 
-The performance bootstrap and sixth fixture are verified in the repository. Next add the Angular render adapter, rebuild the neutral application, select the generated module in the Rust executable, and verify actual HTTP page responses. Then serve the matching browser assets and repeat the established browser hydration and counter checks.
+The performance bootstrap and sixth fixture are verified in the repository. The next [HTTP adapter proposal](004-angular-http-adapter.md) includes the exact TypeScript entry and Rust path edits, with successful temporary build and HTTP checks. Apply and verify those edits in the repository, then serve the matching browser assets and repeat the established browser hydration and counter checks.
 
 ## Limits
 

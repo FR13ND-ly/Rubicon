@@ -97,7 +97,7 @@ The screenshot records the Node.js development build after interaction. Browser 
 
 ## Next Steps
 
-1. Register and verify the embedded Web APIs, then add the adapter from Rubicon's request/response contract to the neutral Web handler.
+1. The selected embedded Web APIs are implemented and verified. Apply the checked [TypeScript adapter and Rust module selection](../../docs/experiments/004-angular-http-adapter.md), then repeat its HTTP checks in the repository.
 2. Render the same application through Rubicon and serve its matching browser assets.
 3. Repeat HTTP, browser hydration, and interaction checks through the Rust host.
 4. Add native data access and lifecycle controls before performance evaluation.

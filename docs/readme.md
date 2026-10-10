@@ -31,6 +31,8 @@ Update this index when document status changes or new documents are added.
 
 ## Experiments
 
+- [004: Angular adapter and Rust HTTP delivery](experiments/004-angular-http-adapter.md), Completed temporary integration check; author implementation pending. The TypeScript entry exported render, and Axum delivered Home/About SSR, an unknown-route 404, query routing, and an empty HEAD response with matching Content-Length. Browser assets returned 404; hydration and performance remain pending.
+
 - [003: Performance API and first embedded Angular render](experiments/003-performance-angular-render.md), Completed temporary correctness check with verified repository performance API implementation. A real Deno performance object enabled Home/About SSR through the temporary Rust worker, a controlled 404, and a HEAD representation. Six fixtures passed in both the copy and repository. The Angular adapter, HTTP delivery, browser hydration through Rubicon, and performance measurement remain pending.
 
 - [002: Web Request and Response objects](experiments/002-web-fetch-objects.md), Completed temporary correctness check with verified repository implementation. Pinned Deno extensions and a fifth worker fixture passed selected Request/Response semantics, cookie separation, and split UTF-8 body decoding. No network or Angular handler was invoked in this experiment.
