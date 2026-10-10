@@ -535,6 +535,8 @@ This establishes selected JavaScript stream and abort behavior, not complete Web
 
 ## Open Questions
 
+The [Web Request/Response experiment](../experiments/002-web-fetch-objects.md) checked the next proposal in a temporary copy of `8e977c7`: pinned deno_fetch and deno_net extensions, three public object constructors, and a fifth worker fixture. The corrected check passed request URL canonicalization, header normalization, separate cookies, cloned response bodies, split UTF-8 decoding, and repeated body-read rejection. This proposal is not applied to the repository; public fetch, native networking, and Angular handler execution remain pending.
+
 | Question | Impact | Next action |
 | --- | --- | --- |
 | Which generated Angular entrypoint and manifests are required? | Defines the artifact-loading integration. | Use the implemented neutral build and verify lazy bootstrap and asset imports during embedded rendering. |

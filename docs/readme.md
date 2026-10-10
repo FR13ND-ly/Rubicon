@@ -31,4 +31,6 @@ Update this index when document status changes or new documents are added.
 
 ## Experiments
 
+- [002: Web Request and Response objects](experiments/002-web-fetch-objects.md), Completed temporary correctness check; author implementation pending. A proposed Deno extension setup and fifth worker fixture passed selected Request/Response semantics, cookie separation, and split UTF-8 body decoding. No network or Angular handler was invoked.
+
 - [001: Angular neutral bundle compatibility](experiments/001-angular-runtime-compatibility.md), Completed exploratory check with a verified repository follow-up: the neutral build's module loaded in bare deno_core, while actual embedded rendering and required Web API support remain pending. This is correctness evidence, not a performance benchmark.
