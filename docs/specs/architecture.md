@@ -563,6 +563,8 @@ The [performance/Angular experiment](../experiments/003-performance-angular-rend
 
 The subsequent [HTTP adapter experiment](../experiments/004-angular-http-adapter.md), based on `15f085c`, rebuilt a TypeScript render export and selected its generated module in a temporary Rust executable. The author has now implemented both edits and the actual repository HTTP checks passed as recorded above. Static asset service and browser hydration through Rust are the next steps.
 
+The [browser asset experiment](../experiments/005-browser-assets-hydration.md), based on `6427722`, verifies that next proposal in a temporary Rust copy. A pinned ServeDir service delivered exact browser-file bytes while retaining SSR and 404 behavior. The browser hydrated Home/About, incremented the counter, navigated and reloaded successfully, and captured no warnings/errors. The repository has not yet implemented the file service; the experiment records exact source edits, dependency/lock considerations, and a screenshot of the temporary host.
+
 | Question | Impact | Next action |
 | --- | --- | --- |
 | Which generated Angular entrypoint and manifests are required? | Defines the artifact-loading integration. | Use the implemented neutral build and verify lazy bootstrap and asset imports during embedded rendering. |

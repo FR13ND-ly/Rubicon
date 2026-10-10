@@ -31,6 +31,8 @@ Update this index when document status changes or new documents are added.
 
 ## Experiments
 
+- [005: Browser assets and hydration through Rust](experiments/005-browser-assets-hydration.md), Completed temporary HTTP/browser check; author implementation pending. ServeDir delivered matching JavaScript/CSS/favicon files, and Angular hydrated Home/About through Rust. Counter interaction, navigation, reload, and warning/error checks passed in the copy. Production and performance evaluation remain pending.
+
 - [004: Angular adapter and Rust HTTP delivery](experiments/004-angular-http-adapter.md), Completed temporary integration check with verified repository implementation. The TypeScript entry exports render, and Axum delivers Home/About SSR, an unknown-route 404, query routing, and an empty HEAD response with matching Content-Length. Browser assets return 404; hydration and performance remain pending.
 
 - [003: Performance API and first embedded Angular render](experiments/003-performance-angular-render.md), Completed temporary correctness check with verified repository performance API implementation. A real Deno performance object enabled Home/About SSR through the temporary Rust worker, a controlled 404, and a HEAD representation. Six fixtures passed in both the copy and repository. Experiment 004 records the subsequent repository adapter and HTTP delivery; browser hydration through Rubicon and performance measurement remain pending.

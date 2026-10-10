@@ -170,7 +170,7 @@ Local diagnostic output is retained only in ignored crates/rubicon/target/angula
 
 Home and About should return 200 and already contain their headings in the HTML source. The fallback should return 404 with Not found. HEAD should return 200 with headers and no body. Stop an older Rubicon process before starting the new executable on the same port.
 
-After actual repository verification and its implementation commit, serve the matching dist/rubicon/browser assets through Rust, then repeat the established [hydration and counter checks](../../examples/angular-demo/README.md#browser-hydration-check).
+Repository verification is complete. The next [browser asset proposal](005-browser-assets-hydration.md) contains the exact file-service edits and successful temporary HTTP/hydration checks. Apply and verify it in the repository, then repeat the established [hydration and counter checks](../../examples/angular-demo/README.md#browser-hydration-check).
 
 ## Repository Verification
 

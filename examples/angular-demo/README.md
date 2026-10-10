@@ -98,7 +98,7 @@ The screenshot records the Node.js development build after interaction. Browser 
 ## Next Steps
 
 1. The selected embedded Web APIs and [TypeScript adapter and Rust module selection](../../docs/experiments/004-angular-http-adapter.md) are implemented and verified through HTTP.
-2. Serve the matching browser assets through Rubicon.
+2. Apply the checked [browser file-service proposal](../../docs/experiments/005-browser-assets-hydration.md) and verify its hydration/counter sequence in the repository.
 3. Repeat HTTP, browser hydration, and interaction checks through the Rust host.
 4. Add native data access and lifecycle controls before performance evaluation.
 
