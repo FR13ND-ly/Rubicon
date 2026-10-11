@@ -1,0 +1,76 @@
+{
+  "source_revision": "b7046a877d0b2512b182cb1489e7cefd543ee7f6",
+  "measurement_seconds": 20,
+  "id": "off-r1-20rps",
+  "repetition": 1,
+  "status": "completed",
+  "shutdown": {
+    "helper_pid": 44548,
+    "forced": false,
+    "status": "completed",
+    "server_pid": 18088,
+    "console_members": [
+      18088,
+      44548
+    ],
+    "console_members_at_signal": [
+      18088,
+      44548
+    ],
+    "signal": "CTRL_C_EVENT in verified private console",
+    "server_exit_code": 0,
+    "elapsed_seconds": 32.53099999995902
+  },
+  "generator_pid": 51452,
+  "http_gate": "passed",
+  "server_pid": 18088,
+  "rate": 20,
+  "variant": "off",
+  "config": {
+    "schema_version": 1,
+    "purpose": "Exploratory W-01 renderer timing and instrumentation-cost diagnostic",
+    "k6_version": "2.3.0",
+    "embedded_v8_binding_version": "150.4.0",
+    "embedded_v8_verified_version": "15.0.245.2-rusty",
+    "rates_per_second": [
+      5,
+      20,
+      50
+    ],
+    "repetitions": 2,
+    "warmup_seconds": 10,
+    "warmup_rate": 20,
+    "settle_seconds": 2,
+    "measurement_seconds": 20,
+    "request_timeout_seconds": 2,
+    "grace_seconds": 3,
+    "measurement_vus": 128,
+    "server_affinity_mask": 1,
+    "generator_affinity_mask": 20,
+    "generator_logical_processors": 2,
+    "generator_max_mean_cpu_percent": 85,
+    "resource_sample_ms": 500,
+    "exploratory_p95_limit_ms": 100,
+    "exploratory_max_failure_fraction": 0.001,
+    "origins": {
+      "off": "http://127.0.0.1:3000",
+      "on": "http://127.0.0.1:3000"
+    },
+    "binary_paths": {
+      "off": "crates/rubicon/target/diagnostics-artifacts/rubicon-off.exe",
+      "on": "crates/rubicon/target/diagnostics-artifacts/rubicon-on.exe"
+    },
+    "limitations": [
+      "Two short repetitions on an uncontrolled Windows laptop are exploratory",
+      "Logical CPU masks do not establish physical-core separation; no memory limit is enforced",
+      "Internal events mark export completion, while client intervals mark complete-response receipt",
+      "No per-request client/server latency join; separate percentile values must not be added",
+      "The console helper and controller are outside the server's CPU accounting",
+      "Coverage reconciliation assumes this fixed app only returns HTTP 503 on host admission failure",
+      "Existing production application/browser checks are reused; no personalized-data isolation claim"
+    ]
+  },
+  "control_completed": 7,
+  "recovery_ok": true,
+  "k6_exit_code": 0
+}

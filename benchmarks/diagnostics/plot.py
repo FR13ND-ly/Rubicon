@@ -29,10 +29,11 @@ for variant in ("off", "on"):
         axes[4].plot(rates, [100 * r["client"]["failure_fraction_of_started"] for r in runs], **style)
         axes[5].plot(rates, [r["client"]["server"]["allocated_cpu_mean_percent"] for r in runs], **style)
         if variant == "on":
+            verified = [r for r in runs if r["internal"]["valid"]]
             for percentile, color in (("p50", "#047857"), ("p95", "#7e3a94")):
                 internal_style = dict(style, color=color)
                 for index, metric in ((1, "queue_ms"), (2, "call_export_ms")):
-                    axes[index].plot(rates, [r["internal"]["window"][metric][percentile] for r in runs], **internal_style)
+                    axes[index].plot([r["rate"] for r in verified], [r["internal"]["window"][metric][percentile] for r in verified], **internal_style)
 titles = ["Correct client responses: p95", "Queue wait: enabled variant", "call_export wall time: enabled variant",
           "Correct completions in measurement window", "Failures among started requests", "Server CPU: one logical CPU allocation"]
 labels = ["Complete response (ms)", "Queue wait (ms, log scale)", "call_export (ms)", "Correct responses/s", "Failure fraction (%)", "Mean allocated CPU (%)"]
@@ -54,7 +55,7 @@ axes[0].legend(handles=variant_legend, fontsize=9)
 axes[1].legend(handles=internal_legend, fontsize=9)
 fig.suptitle("Rubicon: renderer timing diagnostic (W-01)", x=.065, y=.985, ha="left", fontsize=19, fontweight="bold")
 fig.text(.065, .943, "Release binaries · same Angular page · 2 independent repetitions per variant/rate · 20-second windows", fontsize=10, color="#4b5563")
-fig.text(.065, .025, "Circles/solid = repetition 1; squares/dashed = repetition 2. Internal export completion and client receipt are separate populations.\nLocal laptop, logical CPU masks, no memory cap. Exploratory data; no sustained-capacity or precise logging-overhead claim.", fontsize=9, color="#4b5563")
+fig.text(.065, .025, "Circles/solid = repetition 1; squares/dashed = repetition 2. Only verified internal windows are plotted; all client outcomes are retained.\nExport completion and client receipt are separate populations. Local laptop, no memory cap; exploratory data, not sustained capacity.", fontsize=9, color="#4b5563")
 fig.tight_layout(rect=(.02, .085, .995, .915), h_pad=2.5, w_pad=2)
 fig.savefig(root / "diagnostics.png", dpi=180, facecolor="white")
 fig.savefig(root / "diagnostics.svg", facecolor="white")

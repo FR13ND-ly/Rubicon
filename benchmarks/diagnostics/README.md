@@ -28,6 +28,7 @@ Use PowerShell 7 and a local Python 3 interpreter. The runner uses the same pinn
 ```powershell
 ./benchmarks/diagnostics/run.ps1 -PythonPath <python.exe> -Smoke -OutputDirectory crates/rubicon/target/diagnostics-smoke-001
 ./benchmarks/diagnostics/run.ps1 -PythonPath <python.exe> -OutputDirectory benchmarks/results/2026-10-11-w01-diagnostics-001
+./benchmarks/diagnostics/run.ps1 -PythonPath <python.exe> -Resume -OutputDirectory <interrupted-experiment-directory>
 ```
 
 The smoke check only validates plumbing. Commit the checked harness/configuration before the complete experiment; the full runner requires a clean checkout. Existing output directories and occupied server ports are refused. The production application/browser artifacts are reused from pilot 006 and their exact hashes are recorded. No new identity-isolation claim is made.
@@ -49,6 +50,8 @@ The standalone [overflow probe](overflow-probe.rs) blocks the sink and uses a tw
 [preflight.json](preflight.json) records two successful smoke pairs, exact event coverage, graceful exits, zero lost log records, and byte-identical client/timing replay. Four deliberately altered logs were rejected: missing event, duplicate event, nonzero drop counter, and missing final counter. Smoke latencies are not performance results.
 
 The first full attempt stopped after eight runs because the analyzer applied the instrumented outcome restriction to the disabled variant, which had one client timeout. Its original data and failed manifest are retained. The restriction was corrected and fixture checks now require a disabled-variant timeout to remain a valid external observation, while an enabled-variant timeout prevents exact internal reconciliation. The load plan, binaries, client script, and application remain the same for the replacement attempt.
+
+The replacement attempt then encountered two real client timeouts in the enabled 50/s run. Its internal summary remains invalid: zero counted writer losses alone does not establish exact coverage. The runner now distinguishes this preserved limitation (analysis exit 2) from a broken analysis process (exit 1), allowing later planned cases to run. Resume is allowed once: it preserves the interrupted manifest, checks all immutable input hashes and the complete original run order, records the continuation revision, and skips only completed cases with both summaries present. Completed runs are never repeated to replace an unfavorable outcome.
 
 ```powershell
 cargo run --locked --offline --manifest-path benchmarks/diagnostics/probe/Cargo.toml

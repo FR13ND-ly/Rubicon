@@ -151,4 +151,10 @@ if __name__ == "__main__":
     if args.mode == "--all":
         aggregate(args.directory)
     else:
-        analyze(args.directory, replay=args.mode == "--replay")
+        try:
+            analyze(args.directory, replay=args.mode == "--replay")
+        except RuntimeError as error:
+            # The summary already preserves this limitation. Distinguish it
+            # from a broken analysis process so the frozen run plan can finish.
+            print(f"DIAGNOSTIC_LIMITATION {error}")
+            raise SystemExit(2)

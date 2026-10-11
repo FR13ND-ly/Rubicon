@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
     [string]$K6Path = 'crates/rubicon/target/pilot-tools/k6-v2.3.0/k6-v2.3.0-windows-amd64/k6.exe',
     [Parameter(Mandatory = $true)][string]$PythonPath,
+    [switch]$Resume,
     [switch]$Smoke
 )
 
@@ -12,7 +13,9 @@ $pilotRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 Set-Location -LiteralPath $pilotRoot
 $pilotOutput = [IO.Path]::GetFullPath((Join-Path $pilotRoot $OutputDirectory))
 if (-not $pilotOutput.StartsWith($pilotRoot + [IO.Path]::DirectorySeparatorChar)) { throw 'Results must remain inside the repository.' }
-if (Test-Path -LiteralPath $pilotOutput) { throw 'Output directory already exists; previous results are never overwritten.' }
+if ($Resume -and $Smoke) { throw 'Only a complete frozen plan can be resumed.' }
+if ((Test-Path -LiteralPath $pilotOutput) -and -not $Resume) { throw 'Output directory already exists; previous results are never overwritten.' }
+if ($Resume -and -not (Test-Path -LiteralPath $pilotOutput)) { throw 'Resume requires an existing experiment directory.' }
 $pilotConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'config.json') -Raw | ConvertFrom-Json
 $pilotV8Binding = [regex]::Match((Get-Content -LiteralPath 'crates/rubicon/Cargo.lock' -Raw), '(?m)^name = "v8"\r?\nversion = "([^"]+)"').Groups[1].Value
 if ($pilotV8Binding -ne $pilotConfig.embedded_v8_binding_version) { throw 'V8 binding changed; refresh the verified engine version before this experiment.' }
@@ -36,7 +39,7 @@ foreach ($variant in @('off', 'on')) {
 }
 if (-not (Test-Path -LiteralPath $PythonPath)) { throw 'Python executable not found.' }
 if ([Environment]::ProcessorCount -lt 5) { throw 'The configured affinity masks require at least five logical processors.' }
-New-Item -ItemType Directory -Path $pilotOutput | Out-Null
+if (-not $Resume) { New-Item -ItemType Directory -Path $pilotOutput | Out-Null }
 
 function Save-PilotJson($Value, [string]$Path) {
     $Value | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $Path -Encoding utf8NoBOM
@@ -167,6 +170,22 @@ $pilotManifest = @{
     correctness_scope = 'Home/About HTTP checks per run; browser checks recorded separately; no personalized-data isolation claim'
     status = 'running'
 }
+if ($Resume) {
+    $previous = Get-Content -LiteralPath (Join-Path $pilotOutput 'manifest.json') -Raw | ConvertFrom-Json -AsHashtable
+    if ($previous.status -ne 'failed') { throw 'Resume requires a preserved failed session.' }
+    $mutableHarness = @('benchmarks/diagnostics/run.ps1', 'benchmarks/diagnostics/analyze.py')
+    foreach ($artifact in $previous.artifact_hashes) {
+        if ($artifact.path -in $mutableHarness) { continue }
+        $current = @($pilotArtifacts | Where-Object { $_.path -eq $artifact.path })
+        if ($current.Count -ne 1 -or $current[0].sha256 -ne $artifact.sha256) { throw ('Resume input changed: ' + $artifact.path) }
+    }
+    $preservedManifest = Join-Path $pilotOutput 'interrupted-manifest.json'
+    if (Test-Path -LiteralPath $preservedManifest) { throw 'This runner allows one explicit continuation only.' }
+    Copy-Item -LiteralPath (Join-Path $pilotOutput 'manifest.json') -Destination $preservedManifest
+    $previous.resume_session = @{ source_revision = $pilotRevision; started_utc = $pilotManifest.started_utc; artifact_hashes = $pilotArtifacts; reason = 'Finish the original frozen plan while retaining internal coverage limitations; existing runs are not repeated' }
+    $previous.status = 'running'
+    $pilotManifest = $previous
+}
 Save-PilotJson $pilotManifest (Join-Path $pilotOutput 'manifest.json')
 $pilotPlan = @()
 for ($repetition = 1; $repetition -le $pilotConfig.repetitions; $repetition++) {
@@ -177,11 +196,26 @@ for ($repetition = 1; $repetition -le $pilotConfig.repetitions; $repetition++) {
         foreach ($variant in $variants) { $pilotPlan += @{ variant = $variant; rate = $rates[$rateIndex]; repetition = $repetition } }
     }
 }
-Save-PilotJson $pilotPlan (Join-Path $pilotOutput 'plan.json')
+if ($Resume) {
+    $previousPlan = @(Get-Content -LiteralPath (Join-Path $pilotOutput 'plan.json') -Raw | ConvertFrom-Json)
+    if ($previousPlan.Count -ne $pilotPlan.Count) { throw 'Resume plan length changed.' }
+    for ($index = 0; $index -lt $pilotPlan.Count; $index++) {
+        foreach ($field in @('variant', 'rate', 'repetition')) {
+            if ($previousPlan[$index].$field -ne $pilotPlan[$index].$field) { throw 'Resume run order changed.' }
+        }
+    }
+} else { Save-PilotJson $pilotPlan (Join-Path $pilotOutput 'plan.json') }
 try {
     foreach ($case in $pilotPlan) {
         $runId = '{0}-r{1}-{2}rps' -f $case.variant, $case.repetition, $case.rate
         $runDirectory = Join-Path $pilotOutput $runId
+        if (Test-Path -LiteralPath $runDirectory) {
+            if (-not $Resume) { throw ('Unexpected existing run: ' + $runId) }
+            $preservedRun = Get-Content -LiteralPath (Join-Path $runDirectory 'run.json') -Raw | ConvertFrom-Json
+            if ($preservedRun.status -ne 'completed' -or -not (Test-Path -LiteralPath (Join-Path $runDirectory 'summary.json')) -or -not (Test-Path -LiteralPath (Join-Path $runDirectory 'diagnostics-summary.json'))) { throw ('Existing run is incomplete: ' + $runId) }
+            Write-Output ('DIAGNOSTIC_RETAIN ' + $runId)
+            continue
+        }
         $rawDirectory = Join-Path $runDirectory 'raw'
         New-Item -ItemType Directory -Path $rawDirectory -Force | Out-Null
         $server = $null; $generator = $null; $writer = $null; $client = $null
@@ -253,10 +287,11 @@ try {
         & $pilotNode (Join-Path $PSScriptRoot '../pilot/analyze.mjs') --run $runDirectory
         if ($LASTEXITCODE -ne 0) { throw ('Analysis failed: ' + $runId) }
         & $PythonPath (Join-Path $PSScriptRoot 'analyze.py') --run $runDirectory
-        if ($LASTEXITCODE -ne 0) { throw ('Diagnostic analysis failed: ' + $runId) }
+        if ($LASTEXITCODE -notin @(0, 2)) { throw ('Diagnostic analysis process failed: ' + $runId) }
         Start-Sleep -Seconds 2
     }
     $pilotManifest.status = 'completed'
+    if ($Resume) { $pilotManifest.resume_session.finished_utc = [datetime]::UtcNow.ToString('o') }
 } catch { $pilotManifest.status = 'failed'; $pilotManifest.error = $_.Exception.Message; throw }
 finally { $pilotManifest.finished_utc = [datetime]::UtcNow.ToString('o'); Save-PilotJson $pilotManifest (Join-Path $pilotOutput 'manifest.json') }
 & $pilotNode (Join-Path $PSScriptRoot '../pilot/analyze.mjs') --all $pilotOutput
