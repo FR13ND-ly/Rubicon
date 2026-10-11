@@ -4,6 +4,7 @@ import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--requests", type=int, default=10)
+parser.add_argument("--url", default="http://127.0.0.1:3000/")
 args = parser.parse_args()
 
 if not 1 <= args.requests <= 100:
@@ -19,7 +20,7 @@ command = [
     "status=%{http_code} "
     "ttfb_s=%{time_starttransfer} "
     "total_s=%{time_total}",
-    "http://127.0.0.1:3000/",
+    args.url,
 ]
 
 for number in range(1, args.requests + 1):
