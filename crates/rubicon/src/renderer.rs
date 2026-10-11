@@ -4,6 +4,9 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::{JavaScriptRuntime, RenderRequest, RenderResponse};
 
+#[cfg(feature = "render-timing")]
+use tracing::Instrument;
+
 const QUEUE_CAPACITY: usize = 16;
 
 struct RenderJob {
@@ -113,9 +116,16 @@ fn run_worker(
             #[cfg(feature = "render-timing")]
             let processing_started = std::time::Instant::now();
 
-            let result = runtime
-                .call_export::<_, RenderResponse>(module_id, "render", &job.request)
-                .await;
+            let call = runtime.call_export::<_, RenderResponse>(module_id, "render", &job.request);
+
+            #[cfg(feature = "render-timing")]
+            let call = call.instrument(tracing::info_span!(
+                target: "rubicon::runtime_timing",
+                "render",
+                request_id = %job.request.request_id,
+            ));
+
+            let result = call.await;
 
             #[cfg(feature = "render-timing")]
             {

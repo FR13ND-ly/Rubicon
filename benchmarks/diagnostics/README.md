@@ -6,6 +6,8 @@
 
 Compare release binaries with render-timing disabled and enabled, using the same production Angular artifacts and the pilot's CPU allocation. Locate queue versus call_export wall time before changing the renderer. This is an exploratory follow-up to [pilot 006](../../docs/experiments/006-ssr-performance-pilot.md), not the full thesis protocol.
 
+The current author implementation also emits [per-stage runtime events](../../docs/guides/renderer-diagnostics.md#runtime-stage-collection). This completed harness analyzes only coarse render_timing records and cannot verify or summarize the new stage records. Add a per-request stage join, sequence/coverage checks, and compact replay in a separate preflight before a stage experiment. Retain experiment 007 binaries and data; use new binary names and output directories for the new source revision.
+
 ## Frozen Plan
 
 [config.json](config.json) selects 5, 20, and 50 requests/s, two independent repetitions, ten seconds of warm-up at 20/s, two seconds to settle, and twenty seconds of measurement. Each run starts a fresh server. Rate order reverses in the second repetition, and variant order alternates. The server receives logical CPU 0; k6 receives logical CPUs 2 and 4. Logging runs inside the server's allocation. Memory is observed, without a cap. The laptop's power, thermal state, and other activity remain uncontrolled.

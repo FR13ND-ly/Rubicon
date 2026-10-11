@@ -100,12 +100,15 @@ impl JavaScriptRuntime {
         TArgument: serde::Serialize,
         TResult: serde::de::DeserializeOwned,
     {
-        let namespace = self
-            .inner
-            .get_module_namespace(module_id)
-            .map_err(|error| format!("Module namespace access failed: {error}"))?;
+        #[cfg(feature = "render-timing")]
+        let prepare_started = std::time::Instant::now();
 
-        let (function, argument) = {
+        let prepared = (|| {
+            let namespace = self
+                .inner
+                .get_module_namespace(module_id)
+                .map_err(|error| format!("Module namespace access failed: {error}"))?;
+
             deno_core::scope!(scope, &mut self.inner);
             let namespace = v8::Local::new(scope, namespace);
 
@@ -122,26 +125,79 @@ impl JavaScriptRuntime {
             let argument = serde_v8::to_v8(scope, argument)
                 .map_err(|error| format!("Argument conversion failed: {error}"))?;
 
-            (
+            Ok::<_, String>((
                 v8::Global::new(scope, function),
                 v8::Global::new(scope, argument),
-            )
-        };
+            ))
+        })();
+
+        #[cfg(feature = "render-timing")]
+        {
+            let elapsed_us = prepare_started.elapsed().as_micros();
+
+            tracing::info!(
+                target: "rubicon::runtime_timing",
+                stage = "prepare",
+                elapsed_us,
+                ok = prepared.is_ok(),
+                "runtime_stage_timing",
+            );
+        }
+
+        let (function, argument) = prepared?;
+
+        #[cfg(feature = "render-timing")]
+        let execute_started = std::time::Instant::now();
 
         let arguments = [argument];
         let call = Box::pin(self.inner.call_with_args(&function, &arguments));
 
-        let result = self
+        let executed = self
             .inner
             .with_event_loop_promise(call, Default::default())
             .await
-            .map_err(|error| format!("Export execution failed: {error}"))?;
+            .map_err(|error| format!("Export execution failed: {error}"));
 
-        deno_core::scope!(scope, &mut self.inner);
-        let local = v8::Local::new(scope, result);
+        #[cfg(feature = "render-timing")]
+        {
+            let elapsed_us = execute_started.elapsed().as_micros();
 
-        serde_v8::from_v8::<TResult>(scope, local)
-            .map_err(|error| format!("Result conversion failed: {error}"))
+            tracing::info!(
+                target: "rubicon::runtime_timing",
+                stage = "execute",
+                elapsed_us,
+                ok = executed.is_ok(),
+                "runtime_stage_timing",
+            );
+        }
+
+        let result = executed?;
+
+        #[cfg(feature = "render-timing")]
+        let convert_started = std::time::Instant::now();
+
+        let converted = {
+            deno_core::scope!(scope, &mut self.inner);
+            let local = v8::Local::new(scope, result);
+
+            serde_v8::from_v8::<TResult>(scope, local)
+                .map_err(|error| format!("Result conversion failed: {error}"))
+        };
+
+        #[cfg(feature = "render-timing")]
+        {
+            let elapsed_us = convert_started.elapsed().as_micros();
+
+            tracing::info!(
+                target: "rubicon::runtime_timing",
+                stage = "convert",
+                elapsed_us,
+                ok = converted.is_ok(),
+                "runtime_stage_timing",
+            );
+        }
+
+        converted
     }
 }
 
