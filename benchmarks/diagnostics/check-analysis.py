@@ -45,6 +45,29 @@ def main():
             results.append({"case": name, "rejected": True, "reason": str(error)})
         else:
             raise AssertionError(f"Incorrect diagnostic fixture was accepted: {name}")
+    # A client timeout remains a measured external failure. It blocks exact
+    # event reconciliation only when the variant actually emits events.
+    for variant in ("off", "on"):
+        directory = output / f"transport-{variant}"
+        (directory / "raw").mkdir(parents=True)
+        run = analysis.load(source / "run.json")
+        client = analysis.load(source / "summary.json")
+        run["variant"] = variant
+        client["outcomes"]["correct"] -= 1
+        client["outcomes"]["transport"] = 1
+        analysis.save(directory / "run.json", run)
+        analysis.save(directory / "summary.json", client)
+        (directory / "raw/server.stderr.log").write_text(original if variant == "on" else "", encoding="utf-8")
+        try:
+            analysis.analyze(directory)
+        except RuntimeError as error:
+            if variant != "on":
+                raise AssertionError("Feature-disabled client failures must remain measurable") from error
+            results.append({"case": f"transport-{variant}", "rejected": True, "reason": str(error)})
+        else:
+            if variant != "off":
+                raise AssertionError("Instrumented timeout prevents exact event reconciliation")
+            results.append({"case": f"transport-{variant}", "accepted_external_observation": True})
     analysis.save(output / "checks.json", results)
     print(f"DIAGNOSTIC_NEGATIVE_CHECKS_PASS cases={len(results)}")
 

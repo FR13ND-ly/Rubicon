@@ -77,11 +77,11 @@ def analyze(directory, replay=False):
         errors.append("Private console membership changed")
     if not client["valid"]:
         errors.append("Invalid client measurement")
+    instrumented = run["variant"] == "on"
     phases = [client["warmup"]["outcomes"], client["outcomes"]]
-    if any(any(outcome not in {"correct", "http_503"} and count for outcome, count in phase.items()) for phase in phases):
+    if instrumented and any(any(outcome not in {"correct", "http_503"} and count for outcome, count in phase.items()) for phase in phases):
         errors.append("Unexpected outcomes prevent exact processed-event reconciliation")
     expected = run["control_completed"] + sum(phase.get("correct", 0) for phase in phases)
-    instrumented = run["variant"] == "on"
     if instrumented:
         if counters != [0]:
             errors.append("Missing, duplicated, or nonzero final drop counter")

@@ -67,5 +67,43 @@
     "on": "7fdbc978ddd1e5dddd8904c0ceee213a0882299f1da6287bcf7401c7312b15a7"
   },
   "original_pilot_binary_preserved_sha256": "9bbe3542224822cb6fb99b4b91bc54e24a87af9156087529d06f55266978b73c",
-  "scope": "Smoke checks validate plumbing, not performance; complete experiment remains pending"
+  "scope": "Smoke checks validate plumbing, not performance; complete experiment remains pending",
+  "analysis_scope_checks": [
+    {
+      "case": "missing-event",
+      "rejected": true,
+      "reason": "Processed-event coverage mismatch: expected 109, found 108"
+    },
+    {
+      "case": "duplicate-event",
+      "rejected": true,
+      "reason": "Processed-event coverage mismatch: expected 109, found 110; Duplicate request identifiers in timing records"
+    },
+    {
+      "case": "nonzero-drop",
+      "rejected": true,
+      "reason": "Missing, duplicated, or nonzero final drop counter"
+    },
+    {
+      "case": "missing-counter",
+      "rejected": true,
+      "reason": "Missing, duplicated, or nonzero final drop counter"
+    },
+    {
+      "case": "transport-off",
+      "accepted_external_observation": true
+    },
+    {
+      "case": "transport-on",
+      "rejected": true,
+      "reason": "Unexpected outcomes prevent exact processed-event reconciliation; Processed-event coverage mismatch: expected 108, found 109"
+    }
+  ],
+  "first_attempt": {
+    "path": "benchmarks/results/2026-10-11-w01-diagnostics-001",
+    "status": "aborted by overly strict analyzer",
+    "preserved_transport_failures": 1,
+    "completed_runs": 8,
+    "replacement_plan_and_binaries_unchanged": true
+  }
 }
