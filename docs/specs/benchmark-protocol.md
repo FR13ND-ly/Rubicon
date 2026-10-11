@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-11
-**Implementation:** Exploratory W-01 harness checked; full protocol evaluation pending
+**Implementation:** Exploratory W-01 pilot completed; full protocol evaluation pending
 
 ## Purpose and Context
 
@@ -14,6 +14,8 @@ The primary objective is the highest sustained rate of correct responses that me
 No performance results are established by this document. Exact workload parameters, versions, hardware, thresholds, and durations must be frozen in the experiment manifest before a comparison is interpreted.
 
 The [local pilot](../../benchmarks/pilot/README.md) has a separate frozen configuration and explicit deviations: short windows, two repetitions, uncontrolled laptop conditions, observed memory without a cap, and no personalized-data isolation gate. It is intended to select later experiments. Its completion must not be presented as satisfaction of this full protocol or proof of sustained capacity.
+
+[Experiment 006](../experiments/006-ssr-performance-pilot.md) records the completed pilot, including unfavorable Rubicon results, client concurrency limits, and a proposed worker-timing investigation. The requirements below remain applicable to the final evaluation.
 
 ## Scope
 

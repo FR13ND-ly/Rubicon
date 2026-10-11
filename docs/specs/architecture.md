@@ -3,13 +3,15 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-11
-**Implementation:** Rust HTTP server rendering Angular through a persistent embedded worker and serving browser assets; development and production Angular browser checks passed; lifecycle controls and benchmarks pending
+**Implementation:** Rust HTTP server rendering Angular through a persistent embedded worker and serving browser assets; exploratory W-01 pilot completed; lifecycle controls and full benchmarks pending
 
 ## Purpose and Context
 
 This specification describes the proposed components, build artifacts, and request lifecycle of Rubicon. The architecture must support a reusable hosting product and a separate consuming Angular application.
 
 The initial runtime candidate is deno_core, subject to compatibility validation. Angular rendering remains JavaScript execution within the host process. Rust manages HTTP, scheduling, and native services.
+
+The [exploratory performance pilot](../experiments/006-ssr-performance-pilot.md) records 20 release/production runs of the existing one-worker architecture against Node. Overloaded Rubicon runs delivered approximately 31–32 correct Home responses/s with HTTP 503 and low mean CPU; Node delivered more correct work at lower latency for this configuration. These observations do not identify the internal bottleneck. Measuring queue residence and worker execution/await/conversion times is the next diagnostic step; pooling or runtime changes require separate controlled variants.
 
 ## Scope
 

@@ -1,0 +1,2 @@
+# Keep recorded experiment bytes intact across Windows/Linux checkouts.
+benchmarks/results/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

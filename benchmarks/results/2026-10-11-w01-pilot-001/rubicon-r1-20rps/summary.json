@@ -1,0 +1,110 @@
+{
+  "id": "rubicon-r1-20rps",
+  "variant": "rubicon",
+  "repetition": 1,
+  "offered_rps": 20,
+  "duration_seconds": 20,
+  "nominal_offered": 400,
+  "started": 401,
+  "completed": 401,
+  "correct": 401,
+  "unfinished": 0,
+  "outcomes": {
+    "correct": 401
+  },
+  "dropped": 0,
+  "schedule_residual": -1,
+  "correct_completed_in_window": 400,
+  "correct_rps_in_window": 20,
+  "correct_cohort_rps": 20.05,
+  "correct_completions_after_window": 1,
+  "failure_fraction_of_started": 0,
+  "latency_correct_ms": {
+    "count": 401,
+    "mean": 31.069972319201998,
+    "min": 14.0191,
+    "p50": 31.0911,
+    "p95": 42.4735,
+    "p99": 53.0504,
+    "max": 62.2036
+  },
+  "latency_all_ms": {
+    "count": 401,
+    "mean": 31.069972319201998,
+    "min": 14.0191,
+    "p50": 31.0911,
+    "p95": 42.4735,
+    "p99": 53.0504,
+    "max": 62.2036
+  },
+  "ttfb_correct_ms": {
+    "count": 401,
+    "mean": 30.913499999999996,
+    "min": 13.5391,
+    "p50": 31.0911,
+    "p95": 42.4735,
+    "p99": 51.855,
+    "max": 62.2036
+  },
+  "blocked_ms": {
+    "count": 401,
+    "mean": 0.1734466334164588,
+    "min": 0,
+    "p50": 0,
+    "p95": 1.0372,
+    "p99": 1.5184,
+    "max": 3.3246
+  },
+  "connecting_ms": {
+    "count": 401,
+    "mean": 0.15868578553615958,
+    "min": 0,
+    "p50": 0,
+    "p95": 1.0255,
+    "p99": 1.5184,
+    "max": 3.3246
+  },
+  "server": {
+    "samples": 37,
+    "sampled_seconds": 19.507,
+    "cpu_ms": 2187.5,
+    "allocated_cpu_mean_percent": 11.213923207053877,
+    "cpu_ms_per_correct_in_sampled_interval": 5.59462915601023,
+    "working_set_peak_mib": 110.4296875,
+    "private_bytes_peak_mib": 93.1015625,
+    "affinity_masks": [
+      1
+    ]
+  },
+  "generator": {
+    "samples": 37,
+    "sampled_seconds": 19.505,
+    "cpu_ms": 812.5,
+    "allocated_cpu_mean_percent": 2.082799282235324,
+    "cpu_ms_per_correct_in_sampled_interval": null,
+    "working_set_peak_mib": 68.51171875,
+    "private_bytes_peak_mib": 95.41796875,
+    "affinity_masks": [
+      20
+    ]
+  },
+  "generator_headroom": true,
+  "valid": true,
+  "validity_errors": [],
+  "passes_exploratory_limits": true,
+  "recovery_ok": true,
+  "warmup": {
+    "started": 200,
+    "completed": 200,
+    "outcomes": {
+      "correct": 200
+    },
+    "dropped": 0
+  },
+  "phase_start_utc": "2026-10-11T07:41:42.757Z",
+  "artifacts": {
+    "samples_sha256": "28287298920669cacebd65da543c7b39f131a300ced22fc99aa2d709cfe79c9e",
+    "resources_sha256": "1be71e181213cd047a5f600304578989204c776656bdb4d3814ef76e21f1ec12",
+    "raw_sha256": "cb4f8cdf96b15d6889feb11585ec7bf82aeadfb7c5f5c17493fcb8d02ab8a5da"
+  }
+}

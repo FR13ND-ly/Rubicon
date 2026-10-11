@@ -1,0 +1,293 @@
+{
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": []
+  },
+  "options": {
+    "summaryTimeUnit": "",
+    "noColor": true,
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(95)",
+      "p(99)"
+    ]
+  },
+  "state": {
+    "isStdOutTTY": false,
+    "isStdErrTTY": false,
+    "testRunDurationMs": 32468.7037
+  },
+  "metrics": {
+    "iterations": {
+      "values": {
+        "count": 5355,
+        "rate": 164.92805039210728
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 5355,
+        "rate": 164.92805039210728
+      }
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 5355
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 6.0661,
+        "med": 435.3453,
+        "max": 1057.2731,
+        "p(95)": 653.0440400000001,
+        "p(99)": 913.9545160000004,
+        "avg": 433.84635719887956
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0,
+        "med": 0,
+        "max": 61.6474,
+        "p(95)": 0,
+        "p(99)": 1.019038,
+        "avg": 0.05846552754435108
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0,
+        "max": 0,
+        "p(95)": 0,
+        "p(99)": 0,
+        "avg": 0,
+        "min": 0
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(99)": 676.108,
+        "avg": 293.326070887021,
+        "min": 3.0338,
+        "med": 288.1214,
+        "max": 944.3452,
+        "p(95)": 477.19086000000004
+      }
+    },
+    "vus_max": {
+      "values": {
+        "value": 128,
+        "min": 128,
+        "max": 128
+      },
+      "type": "gauge",
+      "contains": "default"
+    },
+    "dropped_iterations{scenario:measure}": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2846,
+        "rate": 87.65363798616943
+      },
+      "thresholds": {
+        "count==0": {
+          "ok": false
+        }
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 651.9836300000001,
+        "p(99)": 908.30685,
+        "avg": 433.59841189542453,
+        "min": 5.8048,
+        "med": 434.9355,
+        "max": 1056.7672
+      }
+    },
+    "data_received": {
+      "values": {
+        "count": 11647125,
+        "rate": 358718.50960283336
+      },
+      "type": "counter",
+      "contains": "data"
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 24.6994,
+        "p(95)": 0,
+        "p(99)": 0.6805320000000006,
+        "avg": 0.03141015873015873,
+        "min": 0,
+        "med": 0
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "rate": 19131.653845484445,
+        "count": 621180
+      }
+    },
+    "pilot_correct{phase:measure}": {
+      "values": {
+        "rate": 1,
+        "passes": 5154,
+        "fails": 0
+      },
+      "thresholds": {
+        "rate>=0.999": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default"
+    },
+    "pilot_correct": {
+      "values": {
+        "rate": 1,
+        "passes": 5355,
+        "fails": 0
+      },
+      "type": "rate",
+      "contains": "default"
+    },
+    "pilot_ttfb_ms": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 477.19086000000004,
+        "p(99)": 676.108,
+        "avg": 293.326070887021,
+        "min": 3.0338,
+        "med": 288.1214,
+        "max": 944.3452
+      }
+    },
+    "pilot_complete_ms": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 1056.7672,
+        "p(95)": 651.9836300000001,
+        "p(99)": 908.30685,
+        "avg": 433.59841189542453,
+        "min": 5.8048,
+        "med": 434.9355
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 396.9839,
+        "p(95)": 248.34699000000003,
+        "p(99)": 310.0961,
+        "avg": 140.24093084967424,
+        "min": 0,
+        "med": 137.4832
+      }
+    },
+    "vus": {
+      "contains": "default",
+      "values": {
+        "value": 120,
+        "min": 0,
+        "max": 128
+      },
+      "type": "gauge"
+    },
+    "dropped_iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2846,
+        "rate": 87.65363798616943
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0,
+        "med": 0,
+        "max": 61.0264,
+        "p(95)": 0,
+        "p(99)": 0.9721340000000006,
+        "avg": 0.04553979458450047
+      }
+    },
+    "pilot_complete_ms{phase:measure,outcome:correct}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 449.65699848661205,
+        "min": 36.6255,
+        "med": 439.39315,
+        "max": 1056.7672,
+        "p(95)": 655.24703,
+        "p(99)": 910.4940120000002
+      },
+      "thresholds": {
+        "p(95)<=100": {
+          "ok": false
+        }
+      }
+    },
+    "pilot_phase_start_ms": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 1791704827945,
+        "min": 1791704815944,
+        "max": 1791704827945
+      }
+    },
+    "pilot_started": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 164.92805039210728,
+        "count": 5355
+      }
+    },
+    "pilot_completed": {
+      "values": {
+        "rate": 164.92805039210728,
+        "count": 5355
+      },
+      "type": "counter",
+      "contains": "default"
+    }
+  }
+}

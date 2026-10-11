@@ -1,0 +1,111 @@
+{
+  "id": "rubicon-r2-200rps",
+  "variant": "rubicon",
+  "repetition": 2,
+  "offered_rps": 200,
+  "duration_seconds": 20,
+  "nominal_offered": 4000,
+  "started": 4001,
+  "completed": 4001,
+  "correct": 658,
+  "unfinished": 0,
+  "outcomes": {
+    "correct": 658,
+    "http_503": 3343
+  },
+  "dropped": 0,
+  "schedule_residual": -1,
+  "correct_completed_in_window": 641,
+  "correct_rps_in_window": 32.05,
+  "correct_cohort_rps": 32.9,
+  "correct_completions_after_window": 17,
+  "failure_fraction_of_started": 0.8355411147213196,
+  "latency_correct_ms": {
+    "count": 658,
+    "mean": 519.8385006079021,
+    "min": 36.401,
+    "p50": 523.21675,
+    "p95": 577.525165,
+    "p99": 627.5833919999998,
+    "max": 676.8178
+  },
+  "latency_all_ms": {
+    "count": 4001,
+    "mean": 86.39583076730818,
+    "min": 0,
+    "p50": 0.5157,
+    "p95": 527.1702,
+    "p99": 576.2535,
+    "max": 676.8178
+  },
+  "ttfb_correct_ms": {
+    "count": 658,
+    "mean": 519.4782542553186,
+    "min": 36.401,
+    "p50": 523.01905,
+    "p95": 577.1047550000001,
+    "p99": 627.2415419999999,
+    "max": 676.8178
+  },
+  "blocked_ms": {
+    "count": 4001,
+    "mean": 0.026713946513371667,
+    "min": 0,
+    "p50": 0,
+    "p95": 0,
+    "p99": 1.0019,
+    "max": 11.7591
+  },
+  "connecting_ms": {
+    "count": 4001,
+    "mean": 0.02049245188702824,
+    "min": 0,
+    "p50": 0,
+    "p95": 0,
+    "p99": 0.6727,
+    "max": 4.1652
+  },
+  "server": {
+    "samples": 37,
+    "sampled_seconds": 19.507,
+    "cpu_ms": 4875,
+    "allocated_cpu_mean_percent": 24.991028861434355,
+    "cpu_ms_per_correct_in_sampled_interval": 7.787539936102236,
+    "working_set_peak_mib": 114.203125,
+    "private_bytes_peak_mib": 97.36328125,
+    "affinity_masks": [
+      1
+    ]
+  },
+  "generator": {
+    "samples": 37,
+    "sampled_seconds": 19.509,
+    "cpu_ms": 3187.5,
+    "allocated_cpu_mean_percent": 8.169306473935107,
+    "cpu_ms_per_correct_in_sampled_interval": null,
+    "working_set_peak_mib": 78.765625,
+    "private_bytes_peak_mib": 104.62109375,
+    "affinity_masks": [
+      20
+    ]
+  },
+  "generator_headroom": true,
+  "valid": true,
+  "validity_errors": [],
+  "passes_exploratory_limits": false,
+  "recovery_ok": true,
+  "warmup": {
+    "started": 200,
+    "completed": 200,
+    "outcomes": {
+      "correct": 200
+    },
+    "dropped": 0
+  },
+  "phase_start_utc": "2026-10-11T07:48:58.339Z",
+  "artifacts": {
+    "samples_sha256": "9742c1ad681c18e98d6b738958e15b89203723fb8ac9e77f1c86732f72b839da",
+    "resources_sha256": "55a78af11142661d26cde5483ec169bb6b1e2ac3d50d39934ad4d84645abfc76",
+    "raw_sha256": "79e24d7cc2654e669da2feba5b013da8ff6188d5693c6947425bebe90ad025e8"
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "id": "node-r2-100rps",
+  "variant": "node",
+  "repetition": 2,
+  "offered_rps": 100,
+  "duration_seconds": 20,
+  "nominal_offered": 2000,
+  "started": 2001,
+  "completed": 2001,
+  "correct": 2001,
+  "unfinished": 0,
+  "outcomes": {
+    "correct": 2001
+  },
+  "dropped": 0,
+  "schedule_residual": -1,
+  "correct_completed_in_window": 1999,
+  "correct_rps_in_window": 99.95,
+  "correct_cohort_rps": 100.05,
+  "correct_completions_after_window": 2,
+  "failure_fraction_of_started": 0,
+  "latency_correct_ms": {
+    "count": 2001,
+    "mean": 22.51879915042481,
+    "min": 3.3049,
+    "p50": 12.5457,
+    "p95": 77.7823,
+    "p99": 224.832,
+    "max": 294.8507
+  },
+  "latency_all_ms": {
+    "count": 2001,
+    "mean": 22.51879915042481,
+    "min": 3.3049,
+    "p50": 12.5457,
+    "p95": 77.7823,
+    "p99": 224.832,
+    "max": 294.8507
+  },
+  "ttfb_correct_ms": {
+    "count": 2001,
+    "mean": 15.948459270364811,
+    "min": 1.7121,
+    "p50": 9.4522,
+    "p95": 58.9416,
+    "p99": 164.0639,
+    "max": 247.7719
+  },
+  "blocked_ms": {
+    "count": 2001,
+    "mean": 0.058525537231384324,
+    "min": 0,
+    "p50": 0,
+    "p95": 0,
+    "p99": 1.352,
+    "max": 10.1572
+  },
+  "connecting_ms": {
+    "count": 2001,
+    "mean": 0.04510204897551225,
+    "min": 0,
+    "p50": 0,
+    "p95": 0,
+    "p99": 1.2008,
+    "max": 4.9911
+  },
+  "server": {
+    "samples": 37,
+    "sampled_seconds": 19.344,
+    "cpu_ms": 8765.625,
+    "allocated_cpu_mean_percent": 45.31443858560794,
+    "cpu_ms_per_correct_in_sampled_interval": 4.530038759689923,
+    "working_set_peak_mib": 255.9921875,
+    "private_bytes_peak_mib": 288.7890625,
+    "affinity_masks": [
+      1
+    ]
+  },
+  "generator": {
+    "samples": 37,
+    "sampled_seconds": 19.348,
+    "cpu_ms": 2046.875,
+    "allocated_cpu_mean_percent": 5.289629419061401,
+    "cpu_ms_per_correct_in_sampled_interval": null,
+    "working_set_peak_mib": 78.10546875,
+    "private_bytes_peak_mib": 104.2578125,
+    "affinity_masks": [
+      20
+    ]
+  },
+  "generator_headroom": true,
+  "valid": true,
+  "validity_errors": [],
+  "passes_exploratory_limits": true,
+  "recovery_ok": true,
+  "warmup": {
+    "started": 201,
+    "completed": 201,
+    "outcomes": {
+      "correct": 201
+    },
+    "dropped": 0
+  },
+  "phase_start_utc": "2026-10-11T07:50:10.561Z",
+  "artifacts": {
+    "samples_sha256": "31593efea385eb5ec1444c4c595bbe138151058cf2140b7dd5ac6b3622fed40b",
+    "resources_sha256": "f55a2fde0b1a6ccaff284969b5f29b8e1829fbb3457f8db18a471faada123f4d",
+    "raw_sha256": "06a2862af0f6ab2c77fc52f6ae66208debea65181b7977d4c049eb6fcad91f80"
+  }
+}

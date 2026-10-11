@@ -1,6 +1,6 @@
 # W-01 Exploratory Performance Pilot
 
-**Status:** Harness checked; full pilot measurements pending
+**Status:** Completed exploratory pilot; full thesis evaluation pending
 **Created:** 2026-10-11
 **Last updated:** 2026-10-11
 **Scope:** Correctness-gated dynamic Home SSR, without external I/O
@@ -8,6 +8,8 @@
 ## Question and Limits
 
 At what offered rates do the existing Rubicon and Node reference begin to show latency, failed responses, or unstarted work on this laptop? This pilot selects useful rates and follow-up questions. It is not a confirmatory estimate of sustainable capacity or an attribution of differences solely to Rust.
+
+[Experiment 006](../../docs/experiments/006-ssr-performance-pilot.md) records the 20 valid runs at revision 91637e8. Both repetitions passed the exploratory criteria at 20/s for Rubicon and 50/s for Node; Node at 100/s had mixed latency results. Overloaded Rubicon runs produced HTTP 503 and approximately 31–32 correct responses/s. The retained [results](../results/2026-10-11-w01-pilot-001/results.csv) and plots support an investigation of worker wall time, not a Rust speedup claim.
 
 The application has no personalized data or native services. Previous browser checks and the pilot HTTP gates establish only the reference pages' behavior; request identity isolation, general cleanup, deadlines, and worker recovery remain incomplete. These are declared deviations from the full [benchmark protocol](../../docs/specs/benchmark-protocol.md), which still governs final comparisons.
 

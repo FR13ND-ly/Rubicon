@@ -3,7 +3,7 @@
 **Status:** Draft
 **Created:** 2026-10-09
 **Last updated:** 2026-10-11
-**Implementation:** Angular SSR and browser assets through the Rust host; development and production browser checks passed; native services, lifecycle acceptance, and benchmarks pending
+**Implementation:** Angular SSR and browser assets through the Rust host; exploratory W-01 performance pilot completed; native services, lifecycle acceptance, and full benchmark protocol pending
 
 ## Purpose and Context
 
@@ -17,9 +17,11 @@ The intended user is a developer building an Angular application who wants to ru
 
 The Rust prototype verifies JavaScript execution, runtime reuse, local ES module loading, and Axum routes invoking a persistent worker. The host forwards an owned request containing a generated string identifier, absolute URL, method, and repeated header pairs. The worker returns an owned response containing status, repeated headers, and a buffered body; the HTTP handler validates that response before delivery. The queue holds 16 waiting jobs with one active render. Automated checks cover admission rejection, identifiers without wrapping or JavaScript numeric precision loss, response metadata, Promise fulfillment and rejection, and continued execution after ordinary execution and conversion failures. Earlier HTTP checks also verify escaped request values and empty HEAD delivery. These checks do not establish request isolation or resource cleanup.
 
-The [reference application](../../examples/angular-demo/README.md) pins Angular 22.2.2 and provides both the conventional Node.js entrypoint and a neutral entrypoint consumed by Rubicon. Its Home and About pages and signal-based counter passed SSR and browser checks through the Rust host with both development and production Angular builds. The host serves the matching browser files through tower-http 0.7.1; development diagnostics reported hydration without skipped components, and interaction, navigation, and direct About reload passed without captured warnings or errors. Both neutral builds prerendered zero routes. The Rust host was compiled in debug mode, so these are correctness checks rather than performance results. Native services, request isolation, cleanup, and performance results remain pending. The [repository experiment](../experiments/005-browser-assets-hydration.md#repository-verification), [architecture](architecture.md), [rendering contract](rendering-contract.md), and [runtime ADR](../adr/001-runtime-selection.md) record the completed checks and their limits.
+The [reference application](../../examples/angular-demo/README.md) pins Angular 22.2.2 and provides both the conventional Node.js entrypoint and a neutral entrypoint consumed by Rubicon. Its Home and About pages and signal-based counter passed SSR and browser checks through the Rust host with both development and production Angular builds. The host serves the matching browser files through tower-http 0.7.1; development diagnostics reported hydration without skipped components, and interaction, navigation, and direct About reload passed without captured warnings or errors. Both neutral builds prerendered zero routes. Those browser checks used a debug Rust executable and establish correctness. Native services, request isolation, and cleanup remain pending; experiment 006 records the subsequent release performance pilot. The [repository experiment](../experiments/005-browser-assets-hydration.md#repository-verification), [architecture](architecture.md), [rendering contract](rendering-contract.md), and [runtime ADR](../adr/001-runtime-selection.md) record the completed checks and their limits.
 
 ## Scope
+
+The [first performance pilot](../experiments/006-ssr-performance-pilot.md) subsequently used release Rust and production Angular for 20 independent short runs. Node delivered more correct work at lower latency for Home SSR on the recorded laptop. Rubicon's overloaded runs plateaued near 31–32 correct responses/s with HTTP 503 and low mean CPU, motivating measurement of queue and worker wall time. The pilot is a limited experiment, not acceptance of the full protocol; identity/lifecycle gates and sustained comparisons remain pending.
 
 The intended initial scope includes:
 
@@ -102,8 +104,8 @@ For a fixed workload and resource budget, the primary optimization objective is 
 | OV-03 | Open the SSR page and perform an interaction. | Node.js reference and Rust-hosted browser checks. | Verified for the reference pages: development hydration diagnostics and development/production interactions passed. |
 | OV-05 | Alternate request identities, exercise concurrency, and observe cleanup. | Isolation and sustained-operation records. | Planned |
 | OV-06 | Await a controlled native data operation. | Native-service integration check. | Planned |
-| OV-07 | Execute the benchmark protocol. | Versioned experiment record and raw artifacts. | Planned |
-| OV-08 | Review documentation against the implementation revision. | Current summaries and experiment 005 repository record. | Ongoing: summaries synchronized with the browser-assets milestone. |
+| OV-07 | Execute the benchmark protocol. | Versioned experiment record and raw artifacts. | Partial: exploratory experiment 006 completed with retained data; full protocol requirements remain pending. |
+| OV-08 | Review documentation against the implementation revision. | Current summaries and experiment records. | Ongoing: summaries synchronized with the browser-assets and performance-pilot milestones. |
 
 The thesis can establish feasibility and explain performance tradeoffs even if a proposed optimization produces no gain. An inconclusive or unfavorable result must be reported with its limitations.
 

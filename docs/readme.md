@@ -18,7 +18,7 @@ The following documents contain drafts for author review and evidence of complet
 
 The embedded runtime now exposes URL/encoding APIs, four timer functions, exception and event interfaces, abort signals, three stream constructors, Headers/Request/Response, and initialized performance through pinned Deno extensions. Selected URL and UTF-8 behavior is checked by runtime tests executing within current-thread Tokio contexts. Six worker fixtures retain response and error recovery checks while covering microtasks, timer cancellation, Unicode stream content and closure, signal-driven cancellation, Web request/response semantics, and performance marks/measures with explicit cleanup. HTTP responses remain buffered; public fetch and host request cancellation remain pending.
 
-A separate Angular 22.2.2 application serves Home and About pages through its conventional Node.js entrypoint. Direct SSR access, browser hydration, a counter interaction, and navigation have been verified on that reference. Its neutral TypeScript adapter and tower-http 0.7.1 file service are now implemented and verified through the Rust HTTP server. Both development and production Angular builds passed Home/About SSR, query routing, HEAD, asset-byte checks, counter interaction, navigation, and direct About reload. Development logs confirmed hydration with no skipped components. Request isolation, native services, lifecycle controls, and performance evaluation remain pending.
+A separate Angular 22.2.2 application serves Home and About pages through its conventional Node.js entrypoint. Direct SSR access, browser hydration, a counter interaction, and navigation have been verified on that reference. Its neutral TypeScript adapter and tower-http 0.7.1 file service are now implemented and verified through the Rust HTTP server. Both development and production Angular builds passed Home/About SSR, query routing, HEAD, asset-byte checks, counter interaction, navigation, and direct About reload. Development logs confirmed hydration with no skipped components. Request isolation, native services, lifecycle controls, and the full performance evaluation remain pending; experiment 006 records the completed exploratory pilot.
 
 1. [Project overview](specs/project-overview.md)
 2. [Architecture](specs/architecture.md)
@@ -29,9 +29,11 @@ A separate Angular 22.2.2 application serves Home and About pages through its co
 
 Update this index when document status changes or new documents are added.
 
-The [exploratory performance pilot](../benchmarks/pilot/README.md) now provides a checked local load runner, request accounting, process-resource sampling, compact replayable data, and plotting. The full benchmark protocol remains a draft with additional correctness and experimental controls required.
+The [exploratory performance pilot](../benchmarks/pilot/README.md) provides a checked local load runner, request accounting, process-resource sampling, compact replayable data, and plotting. Its 20 runs are complete; the full benchmark protocol remains a draft with additional correctness and experimental controls required.
 
 ## Experiments
+
+- [006: Exploratory SSR performance pilot](experiments/006-ssr-performance-pilot.md), Completed local W-01 load test of release Rust and production Angular Node. All 20 runs had valid accounting and recovery. Node delivered more correct work at lower latency on this page; Rubicon saturated around 31–32 correct responses/s with HTTP 503, despite low mean CPU. Short windows, differing V8 versions, and client concurrency/environmental limits prevent a general or sustained-capacity claim. Compact data, per-run percentiles, resources, hashes, and plots are retained.
 
 - [005: Browser assets and hydration through Rust](experiments/005-browser-assets-hydration.md), Completed temporary check and repository verification. The author selected tower-http 0.7.1; actual development and production Angular builds passed SSR, matching JavaScript/CSS/favicon delivery, HEAD, missing paths, browser interaction, navigation, reload, and warning/error checks. The Rust executable was a debug build; performance evaluation remains pending.
 
