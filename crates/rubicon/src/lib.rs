@@ -1,4 +1,4 @@
-use std::{path::Path, rc::Rc, sync::Arc};
+use std::{future::poll_fn, path::Path, rc::Rc, sync::Arc, task::Poll};
 
 use deno_core::{
     FsModuleLoader, JsRuntime, ModuleId, ModuleSpecifier, RuntimeOptions, serde_v8, v8,
@@ -74,6 +74,18 @@ impl JavaScriptRuntime {
 }
 
 impl JavaScriptRuntime {
+    pub(crate) async fn drive_background_tasks(&mut self) -> Result<(), String> {
+        poll_fn(
+            |cx| match self.inner.poll_event_loop(cx, Default::default()) {
+                Poll::Ready(Err(error)) => {
+                    Poll::Ready(Err(format!("Background event loop failed: {error}")))
+                }
+
+                Poll::Ready(Ok(())) | Poll::Pending => Poll::Pending,
+            },
+        )
+        .await
+    }
     pub async fn load_main_module(&mut self, path: &Path) -> Result<ModuleId, String> {
         let absolute_path = path
             .canonicalize()

@@ -108,7 +108,24 @@ fn run_worker(
             return;
         }
 
-        while let Some(job) = receiver.recv().await {
+        loop {
+            let job = tokio::select! {
+                biased;
+
+                result = runtime.drive_background_tasks() => {
+                    if let Err(error) = result {
+                        eprintln!("{error}");
+                    }
+                    return;
+                }
+
+                job = receiver.recv() => job,
+            };
+
+            let Some(job) = job else {
+                break;
+            };
+
             if job.reply.is_closed() {
                 continue;
             }

@@ -1,4 +1,7 @@
-use std::{path::Path, time::Duration};
+use std::{
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use rubicon::{RenderError, RenderRequest, RenderResponse, Renderer};
 
@@ -17,6 +20,68 @@ async fn main() -> Result<(), String> {
         check_renderer_fixture(fixture_name).await?;
     }
 
+    check_renderer_idle_timers().await?;
+
+    Ok(())
+}
+
+async fn check_renderer_idle_timers() -> Result<(), String> {
+    let module_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/renderer_idle_timers.mjs");
+
+    let renderer = tokio::time::timeout(Duration::from_secs(5), Renderer::start(module_path))
+        .await
+        .expect("Worker initialization exceeded the test time limit")?;
+
+    let first = render(
+        &renderer,
+        "idle-start",
+        "GET",
+        "http://127.0.0.1:3000/start",
+    )
+    .await
+    .expect("Starting background timers failed");
+
+    assert_eq!(first.status, 200);
+    assert_eq!(first.body, "scheduled");
+
+    let idle_started = Instant::now();
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let idle_ms = idle_started.elapsed().as_secs_f64() * 1000.0;
+
+    let inspected = render(
+        &renderer,
+        "idle-inspect",
+        "GET",
+        "http://127.0.0.1:3000/inspect",
+    )
+    .await
+    .expect("An active interval must allow another render");
+
+    assert_eq!(inspected.status, 200);
+
+    let (cleanup, ticks) = inspected
+        .body
+        .split_once('|')
+        .expect("Invalid timer test response");
+
+    let cleanup_ms: f64 = cleanup.parse().expect("The cleanup timer did not execute");
+
+    assert!(
+        cleanup_ms.is_finite() && cleanup_ms >= 0.0 && cleanup_ms < idle_ms,
+        "Cleanup must execute before the second request: \
+         cleanup_ms={cleanup_ms}, idle_ms={idle_ms}"
+    );
+
+    let ticks: u64 = ticks.parse().expect("Invalid interval tick count");
+
+    assert!(ticks > 0, "The interval did not execute while idle");
+
+    drop(renderer);
+
+    println!("Renderer idle timers passed.");
     Ok(())
 }
 
