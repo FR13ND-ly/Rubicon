@@ -13,11 +13,17 @@ use axum::{
 use rubicon::{RenderError, RenderRequest, Renderer, into_http_response};
 use tower_http::services::ServeDir;
 
+#[cfg(windows)]
+mod windows_timer;
+
 const APPLICATION_ORIGIN: &str = "http://127.0.0.1:3000";
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    #[cfg(windows)]
+    let _timer_resolution = windows_timer::TimerResolutionGuard::from_environment()?;
+
     #[cfg(feature = "render-timing")]
     let (timing_guard, timing_dropped) = {
         let (writer, guard) = tracing_appender::non_blocking::NonBlockingBuilder::default()
