@@ -14,6 +14,8 @@ command = [
     "curl.exe",
     "--silent",
     "--show-error",
+    "--noproxy", "*",
+    "--http1.1",
     "--output", "NUL",
     "--max-time", "2",
     "--write-out",
