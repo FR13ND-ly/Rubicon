@@ -1,0 +1,59 @@
+{
+  "id": "on-r1-50rps",
+  "variant": "on",
+  "rate": 50,
+  "repetition": 1,
+  "valid": true,
+  "errors": [],
+  "scope": "Export-completion window; no per-request join to client latency",
+  "expected_session_processed_events": 858,
+  "recorded_session_events": 858,
+  "final_dropped_counters": [
+    0
+  ],
+  "window_events": 634,
+  "window": {
+    "queue_ms": {
+      "count": 634,
+      "mean": 476.28557728706625,
+      "min": 0.016,
+      "p50": 485.153,
+      "p95": 553.5589500000001,
+      "p99": 592.4684599999999,
+      "max": 607.048
+    },
+    "call_export_ms": {
+      "count": 634,
+      "mean": 31.243894321766565,
+      "min": 7.311,
+      "p50": 30.868499999999997,
+      "p95": 39.21245,
+      "p99": 49.84585999999998,
+      "max": 63.482
+    }
+  },
+  "all_session": {
+    "queue_ms": {
+      "count": 858,
+      "mean": 360.6712610722611,
+      "min": 0.01,
+      "p50": 478.366,
+      "p95": 538.82915,
+      "p99": 587.5999899999998,
+      "max": 607.048
+    },
+    "call_export_ms": {
+      "count": 858,
+      "mean": 30.625566433566433,
+      "min": 0.592,
+      "p50": 30.752499999999998,
+      "p95": 38.159749999999995,
+      "p99": 49.53262999999999,
+      "max": 87.744
+    }
+  },
+  "artifacts": {
+    "server_stderr_sha256": "354dfb9a9494c13067d459b25d3f2b6f6119178278cbf552e8a2f7163eb3870d",
+    "timings_sha256": "735ac75dbf71b113c91d6ea8debad987a137dcb5eebb7c427f3002606d08b632"
+  }
+}

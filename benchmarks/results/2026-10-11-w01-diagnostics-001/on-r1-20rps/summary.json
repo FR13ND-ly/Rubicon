@@ -1,0 +1,110 @@
+{
+  "id": "on-r1-20rps",
+  "variant": "on",
+  "repetition": 1,
+  "offered_rps": 20,
+  "duration_seconds": 20,
+  "nominal_offered": 400,
+  "started": 400,
+  "completed": 400,
+  "correct": 400,
+  "unfinished": 0,
+  "outcomes": {
+    "correct": 400
+  },
+  "dropped": 0,
+  "schedule_residual": 0,
+  "correct_completed_in_window": 400,
+  "correct_rps_in_window": 20,
+  "correct_cohort_rps": 20,
+  "correct_completions_after_window": 0,
+  "failure_fraction_of_started": 0,
+  "latency_correct_ms": {
+    "count": 400,
+    "mean": 29.036249749999982,
+    "min": 10.3031,
+    "p50": 29.07645,
+    "p95": 37.09552,
+    "p99": 44.278346,
+    "max": 49.261
+  },
+  "latency_all_ms": {
+    "count": 400,
+    "mean": 29.036249749999982,
+    "min": 10.3031,
+    "p50": 29.07645,
+    "p95": 37.09552,
+    "p99": 44.278346,
+    "max": 49.261
+  },
+  "ttfb_correct_ms": {
+    "count": 400,
+    "mean": 28.925595999999995,
+    "min": 9.3784,
+    "p50": 28.96375,
+    "p95": 36.50921499999999,
+    "p99": 44.278346,
+    "max": 49.261
+  },
+  "blocked_ms": {
+    "count": 400,
+    "mean": 0.19187025000000002,
+    "min": 0,
+    "p50": 0,
+    "p95": 1.027145,
+    "p99": 1.4561959999999996,
+    "max": 1.8003
+  },
+  "connecting_ms": {
+    "count": 400,
+    "mean": 0.16874549999999988,
+    "min": 0,
+    "p50": 0,
+    "p95": 1.00776,
+    "p99": 1.2745579999999999,
+    "max": 1.599
+  },
+  "server": {
+    "samples": 38,
+    "sampled_seconds": 19.569,
+    "cpu_ms": 2078.125,
+    "allocated_cpu_mean_percent": 10.619474679339772,
+    "cpu_ms_per_correct_in_sampled_interval": 5.314897698209719,
+    "working_set_peak_mib": 110.87109375,
+    "private_bytes_peak_mib": 93.43359375,
+    "affinity_masks": [
+      1
+    ]
+  },
+  "generator": {
+    "samples": 38,
+    "sampled_seconds": 19.567,
+    "cpu_ms": 203.125,
+    "allocated_cpu_mean_percent": 0.5190499310062862,
+    "cpu_ms_per_correct_in_sampled_interval": null,
+    "working_set_peak_mib": 67.34765625,
+    "private_bytes_peak_mib": 94.1640625,
+    "affinity_masks": [
+      20
+    ]
+  },
+  "generator_headroom": true,
+  "valid": true,
+  "validity_errors": [],
+  "passes_exploratory_limits": true,
+  "recovery_ok": true,
+  "warmup": {
+    "started": 201,
+    "completed": 201,
+    "outcomes": {
+      "correct": 201
+    },
+    "dropped": 0
+  },
+  "phase_start_utc": "2026-10-11T09:05:12.406Z",
+  "artifacts": {
+    "samples_sha256": "78246fe01802055b021225671b5653a4a7ed6b0eeee0e1f034d378d4bf00dfb3",
+    "resources_sha256": "7785e2f627cc964c47e7efadd4614b270057cd02a198bbc3d8d60531df0fa118",
+    "raw_sha256": "c428ed9a7171f8c839932cbbb13dd5fc1437d5f9a07a9ad4c4ea859904be1b28"
+  }
+}
