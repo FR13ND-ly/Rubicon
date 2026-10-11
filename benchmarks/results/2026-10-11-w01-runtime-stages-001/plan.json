@@ -1,0 +1,42 @@
+[
+  {
+    "rate": 5,
+    "variant": "off",
+    "repetition": 1
+  },
+  {
+    "rate": 5,
+    "variant": "on",
+    "repetition": 1
+  },
+  {
+    "rate": 20,
+    "variant": "on",
+    "repetition": 1
+  },
+  {
+    "rate": 20,
+    "variant": "off",
+    "repetition": 1
+  },
+  {
+    "rate": 20,
+    "variant": "on",
+    "repetition": 2
+  },
+  {
+    "rate": 20,
+    "variant": "off",
+    "repetition": 2
+  },
+  {
+    "rate": 5,
+    "variant": "off",
+    "repetition": 2
+  },
+  {
+    "rate": 5,
+    "variant": "on",
+    "repetition": 2
+  }
+]

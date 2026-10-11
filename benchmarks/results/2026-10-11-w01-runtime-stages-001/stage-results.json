@@ -1,0 +1,760 @@
+{
+  "runs": [
+    {
+      "schema_version": 1,
+      "id": "off-r1-20rps",
+      "variant": "off",
+      "rate": 20,
+      "repetition": 1,
+      "valid": true,
+      "stage_join_valid": true,
+      "errors": [],
+      "parser_errors": [],
+      "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+      "recorded_stage_events": 0,
+      "recorded_export_events": 0,
+      "window_exports": 0,
+      "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+      "first_control": {
+        "bytes": 1970,
+        "content_gate": "passed",
+        "status": 200,
+        "started_utc": "2026-10-11T13:27:58.8097209Z",
+        "finished_utc": "2026-10-11T13:27:58.9308745Z",
+        "expected_request_id": "1",
+        "association": "Ordered initial control request; no request-ID response header",
+        "client_elapsed_ms": 121.1398
+      },
+      "first_render": null,
+      "window": {
+        "prepare_ms": null,
+        "execute_ms": null,
+        "convert_ms": null,
+        "stage_sum_ms": null,
+        "other_call_ms": null
+      },
+      "all_session": {
+        "prepare_ms": null,
+        "execute_ms": null,
+        "convert_ms": null,
+        "stage_sum_ms": null,
+        "other_call_ms": null
+      },
+      "artifacts": {
+        "run_sha256": "73d0a650dc57473f6e15c62a40a96839f5398ab7e7fbb9e65b3309b9c84ae044",
+        "client_summary_sha256": "9133836c47d68346154684cbf963045f2a59784b073a2b4191ed4626712c446f",
+        "coarse_summary_sha256": "0712c99e433c2c94b477ac598c64e4f8e88547a18cca9ddfe8324adcf29353a9",
+        "coarse_timings_sha256": "e060d1fcd9c696e328e0a7cb511bc5b8570a209913c2afc71c246d5cfee05823",
+        "server_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "runtime_events_sha256": "24a04982a3f16cc2e2c2a107212f8671b3433d39cea9ef2ab153af4973ff7c0b"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "off-r1-5rps",
+      "variant": "off",
+      "rate": 5,
+      "repetition": 1,
+      "valid": true,
+      "stage_join_valid": true,
+      "errors": [],
+      "parser_errors": [],
+      "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+      "recorded_stage_events": 0,
+      "recorded_export_events": 0,
+      "window_exports": 0,
+      "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+      "first_control": {
+        "bytes": 1970,
+        "content_gate": "passed",
+        "status": 200,
+        "started_utc": "2026-10-11T13:26:13.1362512Z",
+        "finished_utc": "2026-10-11T13:26:13.2739767Z",
+        "expected_request_id": "1",
+        "association": "Ordered initial control request; no request-ID response header",
+        "client_elapsed_ms": 137.622
+      },
+      "first_render": null,
+      "window": {
+        "prepare_ms": null,
+        "execute_ms": null,
+        "convert_ms": null,
+        "stage_sum_ms": null,
+        "other_call_ms": null
+      },
+      "all_session": {
+        "prepare_ms": null,
+        "execute_ms": null,
+        "convert_ms": null,
+        "stage_sum_ms": null,
+        "other_call_ms": null
+      },
+      "artifacts": {
+        "run_sha256": "31ea39acfba1ffd7ce1f6ebb3231d769d1436ea37e3b3a17ce8ba42c443b1585",
+        "client_summary_sha256": "a8b75d89e13957834a69cb626dd2ad0ac4c7c80b8bbc5b86b9f0745c3e76eb53",
+        "coarse_summary_sha256": "84bfb5e0e00ddd46dbbcd9535e61dde802922b244c82db005b42a810eab27d1f",
+        "coarse_timings_sha256": "e060d1fcd9c696e328e0a7cb511bc5b8570a209913c2afc71c246d5cfee05823",
+        "server_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "runtime_events_sha256": "24a04982a3f16cc2e2c2a107212f8671b3433d39cea9ef2ab153af4973ff7c0b"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "off-r2-20rps",
+      "variant": "off",
+      "rate": 20,
+      "repetition": 2,
+      "valid": true,
+      "stage_join_valid": true,
+      "errors": [],
+      "parser_errors": [],
+      "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+      "recorded_stage_events": 0,
+      "recorded_export_events": 0,
+      "window_exports": 0,
+      "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+      "first_control": {
+        "bytes": 1970,
+        "content_gate": "passed",
+        "status": 200,
+        "started_utc": "2026-10-11T13:29:09.1944616Z",
+        "finished_utc": "2026-10-11T13:29:09.2827232Z",
+        "expected_request_id": "1",
+        "association": "Ordered initial control request; no request-ID response header",
+        "client_elapsed_ms": 88.2418
+      },
+      "first_render": null,
+      "window": {
+        "prepare_ms": null,
+        "execute_ms": null,
+        "convert_ms": null,
+        "stage_sum_ms": null,
+        "other_call_ms": null
+      },
+      "all_session": {
+        "prepare_ms": null,
+        "execute_ms": null,
+        "convert_ms": null,
+        "stage_sum_ms": null,
+        "other_call_ms": null
+      },
+      "artifacts": {
+        "run_sha256": "d8e076623c03786a63bf020e81271fff90b7cb42198ca5ad811b77422027a542",
+        "client_summary_sha256": "43ec8239bd63496c27602eb4d9e707a7141106769312d78390d1bcd038b0ab45",
+        "coarse_summary_sha256": "70ff1b1a5f4aa623623486bb1cb5b835c9365609e491442b1a8958d3945bc91c",
+        "coarse_timings_sha256": "e060d1fcd9c696e328e0a7cb511bc5b8570a209913c2afc71c246d5cfee05823",
+        "server_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "runtime_events_sha256": "24a04982a3f16cc2e2c2a107212f8671b3433d39cea9ef2ab153af4973ff7c0b"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "off-r2-5rps",
+      "variant": "off",
+      "rate": 5,
+      "repetition": 2,
+      "valid": true,
+      "stage_join_valid": true,
+      "errors": [],
+      "parser_errors": [],
+      "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+      "recorded_stage_events": 0,
+      "recorded_export_events": 0,
+      "window_exports": 0,
+      "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+      "first_control": {
+        "bytes": 1970,
+        "content_gate": "passed",
+        "status": 200,
+        "started_utc": "2026-10-11T13:29:44.2391006Z",
+        "finished_utc": "2026-10-11T13:29:44.3742086Z",
+        "expected_request_id": "1",
+        "association": "Ordered initial control request; no request-ID response header",
+        "client_elapsed_ms": 135.0813
+      },
+      "first_render": null,
+      "window": {
+        "prepare_ms": null,
+        "execute_ms": null,
+        "convert_ms": null,
+        "stage_sum_ms": null,
+        "other_call_ms": null
+      },
+      "all_session": {
+        "prepare_ms": null,
+        "execute_ms": null,
+        "convert_ms": null,
+        "stage_sum_ms": null,
+        "other_call_ms": null
+      },
+      "artifacts": {
+        "run_sha256": "76cf0a9e54a8b09245c0378f801e973898773ca66ae31de670ad2b7a788501fb",
+        "client_summary_sha256": "ae818b80130abee42ca1c5d983f559ac0cf951acd236e3120dbf2f3fc50d5368",
+        "coarse_summary_sha256": "1139e1b168bd66711666780938561bc1df2f31846edf022c00e05cdc1a1aaa92",
+        "coarse_timings_sha256": "e060d1fcd9c696e328e0a7cb511bc5b8570a209913c2afc71c246d5cfee05823",
+        "server_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "runtime_events_sha256": "24a04982a3f16cc2e2c2a107212f8671b3433d39cea9ef2ab153af4973ff7c0b"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "on-r1-20rps",
+      "variant": "on",
+      "rate": 20,
+      "repetition": 1,
+      "valid": true,
+      "stage_join_valid": true,
+      "errors": [],
+      "parser_errors": [],
+      "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+      "recorded_stage_events": 1827,
+      "recorded_export_events": 609,
+      "window_exports": 400,
+      "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+      "first_control": {
+        "bytes": 1970,
+        "content_gate": "passed",
+        "status": 200,
+        "started_utc": "2026-10-11T13:27:23.5502159Z",
+        "finished_utc": "2026-10-11T13:27:23.6837468Z",
+        "expected_request_id": "1",
+        "association": "Ordered initial control request; no request-ID response header",
+        "client_elapsed_ms": 133.5117
+      },
+      "first_render": {
+        "request_id": "1",
+        "queue_ms": 0.035,
+        "call_export_ms": 91.287,
+        "stages_ms": {
+          "prepare": 0.059,
+          "execute": 90.937,
+          "convert": 0.01
+        },
+        "ok": true
+      },
+      "window": {
+        "prepare_ms": {
+          "count": 400,
+          "mean": 0.0389725,
+          "min": 0.011,
+          "p50": 0.034,
+          "p95": 0.06604999999999996,
+          "p99": 0.07801999999999998,
+          "max": 0.195
+        },
+        "execute_ms": {
+          "count": 400,
+          "mean": 29.39326,
+          "min": 7.961,
+          "p50": 28.658,
+          "p95": 39.925299999999694,
+          "p99": 68.22542999999999,
+          "max": 72.199
+        },
+        "convert_ms": {
+          "count": 400,
+          "mean": 0.011864999999999999,
+          "min": 0.007,
+          "p50": 0.01,
+          "p95": 0.019,
+          "p99": 0.02300999999999999,
+          "max": 0.046
+        },
+        "stage_sum_ms": {
+          "count": 400,
+          "mean": 29.444097499999998,
+          "min": 8.001,
+          "p50": 28.7115,
+          "p95": 39.9664999999997,
+          "p99": 68.26230999999999,
+          "max": 72.224
+        },
+        "other_call_ms": {
+          "count": 400,
+          "mean": 0.3549125,
+          "min": 0.022,
+          "p50": 0.142,
+          "p95": 0.222,
+          "p99": 0.25603,
+          "max": 42.663
+        }
+      },
+      "all_session": {
+        "prepare_ms": {
+          "count": 609,
+          "mean": 0.03920197044334975,
+          "min": 0.01,
+          "p50": 0.034,
+          "p95": 0.066,
+          "p99": 0.078,
+          "max": 0.195
+        },
+        "execute_ms": {
+          "count": 609,
+          "mean": 29.118748768472905,
+          "min": 0.704,
+          "p50": 28.715,
+          "p95": 36.8114,
+          "p99": 66.76259999999999,
+          "max": 90.937
+        },
+        "convert_ms": {
+          "count": 609,
+          "mean": 0.011986863711001642,
+          "min": 0.004,
+          "p50": 0.01,
+          "p95": 0.019,
+          "p99": 0.026,
+          "max": 0.065
+        },
+        "stage_sum_ms": {
+          "count": 609,
+          "mean": 29.169937602627254,
+          "min": 0.728,
+          "p50": 28.755,
+          "p95": 36.8656,
+          "p99": 66.78739999999999,
+          "max": 91.006
+        },
+        "other_call_ms": {
+          "count": 609,
+          "mean": 0.28425779967159276,
+          "min": 0.022,
+          "p50": 0.143,
+          "p95": 0.22160000000000002,
+          "p99": 0.2587599999999999,
+          "max": 42.663
+        }
+      },
+      "artifacts": {
+        "run_sha256": "8fbcafcc4ff63cd656034ec86162597e8d27656ef2fa7ca0b551830560e9c199",
+        "client_summary_sha256": "e1586a2a87d434ad4190a06206dce76436bb5e7aa6bf9534a222e56c5138b05d",
+        "coarse_summary_sha256": "d78e0763499dc6246ce53bd0b6a74dceef79126bc2cfd786d313a0cda4865540",
+        "coarse_timings_sha256": "65bfc48c0faa6da9f31dee068deb061cfd9e337c23519cbfb4913900fc29d25c",
+        "server_stderr_sha256": "9ca27b6bc30d761936e5364a13d8dd4145c2064ddc6f76913e2134cd1c3e23a7",
+        "runtime_events_sha256": "9ec84022776f283c86235b5994699de36c9c5855c88a51a87183ca4fad9565bd"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "on-r1-5rps",
+      "variant": "on",
+      "rate": 5,
+      "repetition": 1,
+      "valid": true,
+      "stage_join_valid": true,
+      "errors": [],
+      "parser_errors": [],
+      "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+      "recorded_stage_events": 927,
+      "recorded_export_events": 309,
+      "window_exports": 100,
+      "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+      "first_control": {
+        "bytes": 1970,
+        "content_gate": "passed",
+        "status": 200,
+        "started_utc": "2026-10-11T13:26:48.3637386Z",
+        "finished_utc": "2026-10-11T13:26:48.4689463Z",
+        "expected_request_id": "1",
+        "association": "Ordered initial control request; no request-ID response header",
+        "client_elapsed_ms": 105.1902
+      },
+      "first_render": {
+        "request_id": "1",
+        "queue_ms": 0.021,
+        "call_export_ms": 102.736,
+        "stages_ms": {
+          "prepare": 0.056,
+          "execute": 102.516,
+          "convert": 0.01
+        },
+        "ok": true
+      },
+      "window": {
+        "prepare_ms": {
+          "count": 100,
+          "mean": 0.04173,
+          "min": 0.031,
+          "p50": 0.038,
+          "p95": 0.06505,
+          "p99": 0.06801000000000001,
+          "max": 0.069
+        },
+        "execute_ms": {
+          "count": 100,
+          "mean": 28.123710000000003,
+          "min": 11.833,
+          "p50": 28.076500000000003,
+          "p95": 35.564499999999995,
+          "p99": 37.78759000000002,
+          "max": 42.103
+        },
+        "convert_ms": {
+          "count": 100,
+          "mean": 0.01232,
+          "min": 0.007,
+          "p50": 0.012,
+          "p95": 0.02005,
+          "p99": 0.028030000000000017,
+          "max": 0.031
+        },
+        "stage_sum_ms": {
+          "count": 100,
+          "mean": 28.17776,
+          "min": 11.909,
+          "p50": 28.130499999999998,
+          "p95": 35.61485,
+          "p99": 37.83761000000002,
+          "max": 42.155
+        },
+        "other_call_ms": {
+          "count": 100,
+          "mean": 0.14823,
+          "min": 0.069,
+          "p50": 0.1505,
+          "p95": 0.2021,
+          "p99": 0.21515000000000006,
+          "max": 0.23
+        }
+      },
+      "all_session": {
+        "prepare_ms": {
+          "count": 309,
+          "mean": 0.04099029126213592,
+          "min": 0.013,
+          "p50": 0.037,
+          "p95": 0.06359999999999996,
+          "p99": 0.068,
+          "max": 0.149
+        },
+        "execute_ms": {
+          "count": 309,
+          "mean": 28.811511326860842,
+          "min": 0.719,
+          "p50": 28.939,
+          "p95": 36.045399999999994,
+          "p99": 41.79508000000006,
+          "max": 102.516
+        },
+        "convert_ms": {
+          "count": 309,
+          "mean": 0.012158576051779935,
+          "min": 0.004,
+          "p50": 0.011,
+          "p95": 0.02,
+          "p99": 0.027920000000000018,
+          "max": 0.035
+        },
+        "stage_sum_ms": {
+          "count": 309,
+          "mean": 28.864660194174757,
+          "min": 0.744,
+          "p50": 28.987,
+          "p95": 36.1072,
+          "p99": 41.84764000000006,
+          "max": 102.582
+        },
+        "other_call_ms": {
+          "count": 309,
+          "mean": 0.1479967637540453,
+          "min": 0.029,
+          "p50": 0.146,
+          "p95": 0.20959999999999995,
+          "p99": 0.2751200000000002,
+          "max": 0.519
+        }
+      },
+      "artifacts": {
+        "run_sha256": "7ebe75882c482cbfa89787bedadcabe8b0774c1ad2402d90d470b549df47c211",
+        "client_summary_sha256": "9a516ba1eda6b786946243794234ccf6a1d4e949441c526890707f636fe66158",
+        "coarse_summary_sha256": "728dadd705b6b71aa594789be59fdd53456677bcab21e2e37b62ab1a0ffb460e",
+        "coarse_timings_sha256": "4e9d3ce63070fe3b843969f1c2b1f4bdb7b2b11f97b394926cd982859aeeb0ae",
+        "server_stderr_sha256": "174d133ed192278775024a15f16244eff29f71ced4e46f86ae3e13010e055d39",
+        "runtime_events_sha256": "da13c37690ec14e000891a76ff3cd768f5b2fc1f2e3cb61397e26a9e8e2d3a69"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "on-r2-20rps",
+      "variant": "on",
+      "rate": 20,
+      "repetition": 2,
+      "valid": true,
+      "stage_join_valid": true,
+      "errors": [],
+      "parser_errors": [],
+      "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+      "recorded_stage_events": 1824,
+      "recorded_export_events": 608,
+      "window_exports": 400,
+      "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+      "first_control": {
+        "bytes": 1970,
+        "content_gate": "passed",
+        "status": 200,
+        "started_utc": "2026-10-11T13:28:33.9095055Z",
+        "finished_utc": "2026-10-11T13:28:34.0456618Z",
+        "expected_request_id": "1",
+        "association": "Ordered initial control request; no request-ID response header",
+        "client_elapsed_ms": 136.1352
+      },
+      "first_render": {
+        "request_id": "1",
+        "queue_ms": 0.038,
+        "call_export_ms": 93.735,
+        "stages_ms": {
+          "prepare": 0.065,
+          "execute": 93.38,
+          "convert": 0.011
+        },
+        "ok": true
+      },
+      "window": {
+        "prepare_ms": {
+          "count": 400,
+          "mean": 0.04086,
+          "min": 0.014,
+          "p50": 0.0385,
+          "p95": 0.066,
+          "p99": 0.07300999999999999,
+          "max": 0.178
+        },
+        "execute_ms": {
+          "count": 400,
+          "mean": 29.8255425,
+          "min": 9.802,
+          "p50": 28.92,
+          "p95": 48.26324999999993,
+          "p99": 71.43314000000001,
+          "max": 72.223
+        },
+        "convert_ms": {
+          "count": 400,
+          "mean": 0.0111575,
+          "min": 0.007,
+          "p50": 0.009,
+          "p95": 0.018,
+          "p99": 0.022009999999999988,
+          "max": 0.029
+        },
+        "stage_sum_ms": {
+          "count": 400,
+          "mean": 29.87756,
+          "min": 9.99,
+          "p50": 28.953,
+          "p95": 48.32429999999993,
+          "p99": 71.46109,
+          "max": 72.25
+        },
+        "other_call_ms": {
+          "count": 400,
+          "mean": 0.1492025,
+          "min": 0.049,
+          "p50": 0.148,
+          "p95": 0.236,
+          "p99": 0.27304,
+          "max": 0.543
+        }
+      },
+      "all_session": {
+        "prepare_ms": {
+          "count": 608,
+          "mean": 0.04079769736842105,
+          "min": 0.013,
+          "p50": 0.038,
+          "p95": 0.06564999999999999,
+          "p99": 0.073,
+          "max": 0.179
+        },
+        "execute_ms": {
+          "count": 608,
+          "mean": 29.247745065789474,
+          "min": 0.718,
+          "p50": 28.567,
+          "p95": 37.1361,
+          "p99": 70.81003999999973,
+          "max": 93.38
+        },
+        "convert_ms": {
+          "count": 608,
+          "mean": 0.011337171052631578,
+          "min": 0.006,
+          "p50": 0.009,
+          "p95": 0.018649999999999976,
+          "p99": 0.024859999999999903,
+          "max": 0.039
+        },
+        "stage_sum_ms": {
+          "count": 608,
+          "mean": 29.299879934210526,
+          "min": 0.741,
+          "p50": 28.6415,
+          "p95": 37.1918,
+          "p99": 70.83868999999973,
+          "max": 93.456
+        },
+        "other_call_ms": {
+          "count": 608,
+          "mean": 0.14980592105263157,
+          "min": 0.045,
+          "p50": 0.147,
+          "p95": 0.236,
+          "p99": 0.26292999999999994,
+          "max": 0.543
+        }
+      },
+      "artifacts": {
+        "run_sha256": "ad8f7f2ea81d7b21037c837a5146a393e569c1ee4d478bd60973342a0541bbd6",
+        "client_summary_sha256": "096827faf9dff3bc4cc0687b0dcf8f2ae6d477ac2568c61db96474518876a0ea",
+        "coarse_summary_sha256": "ab3cc00bd15cfb6e4130e46cb15a33f8323d02e6f5dd08b9323755ac2549065e",
+        "coarse_timings_sha256": "61cde684a08f866e3d8536f34f1ed6121d61aaebc62d26fa362085b94b43bf75",
+        "server_stderr_sha256": "5caf5e0e5a313a9e24d2fbf48253ae619c466219a88ff9b7258e46383b60b3e6",
+        "runtime_events_sha256": "afe302311a5032c18685f8aba237df379397b6909d575afaedc6a37f26b0f71e"
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "on-r2-5rps",
+      "variant": "on",
+      "rate": 5,
+      "repetition": 2,
+      "valid": false,
+      "stage_join_valid": true,
+      "errors": [
+        "Coarse diagnostic: Invalid client measurement",
+        "Coarse diagnostic: Unexpected outcomes prevent exact processed-event reconciliation"
+      ],
+      "parser_errors": [],
+      "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+      "recorded_stage_events": 858,
+      "recorded_export_events": 286,
+      "window_exports": 100,
+      "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+      "first_control": {
+        "bytes": 1970,
+        "content_gate": "passed",
+        "status": 200,
+        "started_utc": "2026-10-11T13:30:19.3224930Z",
+        "finished_utc": "2026-10-11T13:30:19.4565374Z",
+        "expected_request_id": "1",
+        "association": "Ordered initial control request; no request-ID response header",
+        "client_elapsed_ms": 134.0182
+      },
+      "first_render": {
+        "request_id": "1",
+        "queue_ms": 0.039,
+        "call_export_ms": 90.595,
+        "stages_ms": {
+          "prepare": 0.058,
+          "execute": 90.221,
+          "convert": 0.011
+        },
+        "ok": true
+      },
+      "window": {
+        "prepare_ms": {
+          "count": 100,
+          "mean": 0.05473,
+          "min": 0.031,
+          "p50": 0.035500000000000004,
+          "p95": 0.06405,
+          "p99": 0.08173000000000703,
+          "max": 1.441
+        },
+        "execute_ms": {
+          "count": 100,
+          "mean": 28.94522,
+          "min": 13.871,
+          "p50": 29.64,
+          "p95": 35.55575,
+          "p99": 36.84986000000004,
+          "max": 43.865
+        },
+        "convert_ms": {
+          "count": 100,
+          "mean": 0.01284,
+          "min": 0.007,
+          "p50": 0.011,
+          "p95": 0.022049999999999997,
+          "p99": 0.029010000000000008,
+          "max": 0.03
+        },
+        "stage_sum_ms": {
+          "count": 100,
+          "mean": 29.01279,
+          "min": 13.92,
+          "p50": 29.7025,
+          "p95": 35.8232,
+          "p99": 36.905780000000036,
+          "max": 43.913
+        },
+        "other_call_ms": {
+          "count": 100,
+          "mean": 0.17997,
+          "min": 0.103,
+          "p50": 0.1465,
+          "p95": 0.21974999999999995,
+          "p99": 0.33578000000001473,
+          "max": 3.185
+        }
+      },
+      "all_session": {
+        "prepare_ms": {
+          "count": 286,
+          "mean": 0.04228671328671328,
+          "min": 0.013,
+          "p50": 0.033,
+          "p95": 0.064,
+          "p99": 0.07479999999999973,
+          "max": 1.441
+        },
+        "execute_ms": {
+          "count": 286,
+          "mean": 35.93790559440559,
+          "min": 0.552,
+          "p50": 29.981,
+          "p95": 40.6435,
+          "p99": 405.5167999999999,
+          "max": 677.893
+        },
+        "convert_ms": {
+          "count": 286,
+          "mean": 0.011905594405594406,
+          "min": 0.004,
+          "p50": 0.01,
+          "p95": 0.02075,
+          "p99": 0.029,
+          "max": 0.03
+        },
+        "stage_sum_ms": {
+          "count": 286,
+          "mean": 35.9920979020979,
+          "min": 0.573,
+          "p50": 30.02,
+          "p95": 40.684250000000006,
+          "p99": 405.5400999999999,
+          "max": 677.915
+        },
+        "other_call_ms": {
+          "count": 286,
+          "mean": 0.1517027972027972,
+          "min": 0.02,
+          "p50": 0.128,
+          "p95": 0.22725,
+          "p99": 0.44814999999999183,
+          "max": 3.185
+        }
+      },
+      "artifacts": {
+        "run_sha256": "bcd8c84521b0b7a54d9f76f8fc4ef0c483296986852f9e731bf189bcd69668e6",
+        "client_summary_sha256": "d23634358f13d257adef87e49b745e33905915578c6a05470fc69b37731b9f0c",
+        "coarse_summary_sha256": "cda93827b23a7b49db5e44ab9c26e4fa4a6086aa6aad267ad0155ad4a4631261",
+        "coarse_timings_sha256": "b40c5e803a3fb3854848ddbb47fafdffcab729873d82e27780dcad72de7e340f",
+        "server_stderr_sha256": "8fe615eb4ce41d7221c03282ae1a0351575e960b4e3dbb560e3f7254d2251ff8",
+        "runtime_events_sha256": "a3970a89ebbe2ea94329a007783e61d113400ed07de68a6411be3ce05087a714"
+      }
+    }
+  ],
+  "interpretation": "Independent short release runs; first renders are separate observations. Invalid populations remain flagged."
+}

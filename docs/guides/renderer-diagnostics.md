@@ -1,6 +1,6 @@
 # Renderer Diagnostics
 
-**Status:** Runtime stage collection verified; exploratory coarse timing experiment completed with declared coverage limits
+**Status:** Runtime stage experiment completed with one retained warm-up limitation; coarse experiment retained separately
 **Created:** 2026-10-11
 **Last updated:** 2026-10-11
 **Context:** Follow-up to [performance pilot 006](../experiments/006-ssr-performance-pilot.md)
@@ -99,6 +99,8 @@ Execution and waits account for approximately 99.90% of this one call's enclosin
 The excerpt does not identify build profile, CPU affinity, warm-up state, or HTTP/content validation. If it was produced by the preceding cargo run command without --release, it used a debug build. It cannot be compared directly with the warmed release distributions in experiment 007 or used as a throughput estimate. The author subsequently confirmed Ctrl+C shutdown with RUBICON_DIAGNOSTICS_DROPPED lines=0; the final counter was reported by the author rather than independently captured in the excerpt. Zero reported writer drops alone does not establish complete stage coverage.
 
 The stage coverage/replay pipeline and [experiment 008](../experiments/008-runtime-stage-diagnostic.md) now record the first render separately from warmed requests. Split the JavaScript handler from body buffering and record outer HTTP work in later instrumentation steps. Use thread CPU evidence before attributing execution wall time to computation.
+
+The frozen eight-case release experiment subsequently completed. Three enabled cases have verified populations: initial server exports took 91–103 ms, compared with warmed means of 28–30 ms. Execution and asynchronous waits occupy 98.6–99.3% of the enclosing warmed mean; preparation/conversion means are only tens of microseconds. These are wall-time results, not Angular CPU attribution. The fourth enabled case remains invalid because warm-up had one timeout and 22 dropped arrivals, despite correct later measured responses and zero logger losses. A valid disabled 20/s case also exceeded the 100 ms exploratory client p95 limit. All cases remain retained with 24 byte-identical summary replays. The short uncontrolled repetitions do not establish precise instrumentation cost or sustained capacity.
 
 ## Primary References
 

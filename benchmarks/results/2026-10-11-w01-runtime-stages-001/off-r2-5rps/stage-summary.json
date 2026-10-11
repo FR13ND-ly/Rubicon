@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "off-r2-5rps",
+  "variant": "off",
+  "rate": 5,
+  "repetition": 2,
+  "valid": true,
+  "stage_join_valid": true,
+  "errors": [],
+  "parser_errors": [],
+  "scope": "Stages joined to the same server export-completion cohort; no direct client latency join",
+  "recorded_stage_events": 0,
+  "recorded_export_events": 0,
+  "window_exports": 0,
+  "first_request_association": "Ordered first control request and initial server counter; no request-ID response header",
+  "first_control": {
+    "bytes": 1970,
+    "content_gate": "passed",
+    "status": 200,
+    "started_utc": "2026-10-11T13:29:44.2391006Z",
+    "finished_utc": "2026-10-11T13:29:44.3742086Z",
+    "expected_request_id": "1",
+    "association": "Ordered initial control request; no request-ID response header",
+    "client_elapsed_ms": 135.0813
+  },
+  "first_render": null,
+  "window": {
+    "prepare_ms": null,
+    "execute_ms": null,
+    "convert_ms": null,
+    "stage_sum_ms": null,
+    "other_call_ms": null
+  },
+  "all_session": {
+    "prepare_ms": null,
+    "execute_ms": null,
+    "convert_ms": null,
+    "stage_sum_ms": null,
+    "other_call_ms": null
+  },
+  "artifacts": {
+    "run_sha256": "76cf0a9e54a8b09245c0378f801e973898773ca66ae31de670ad2b7a788501fb",
+    "client_summary_sha256": "ae818b80130abee42ca1c5d983f559ac0cf951acd236e3120dbf2f3fc50d5368",
+    "coarse_summary_sha256": "1139e1b168bd66711666780938561bc1df2f31846edf022c00e05cdc1a1aaa92",
+    "coarse_timings_sha256": "e060d1fcd9c696e328e0a7cb511bc5b8570a209913c2afc71c246d5cfee05823",
+    "server_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runtime_events_sha256": "24a04982a3f16cc2e2c2a107212f8671b3433d39cea9ef2ab153af4973ff7c0b"
+  }
+}

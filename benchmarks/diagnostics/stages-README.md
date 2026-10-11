@@ -1,11 +1,11 @@
 # Runtime Stage Diagnostic
 
-**Status:** Preflight verified; frozen release experiment prepared
+**Status:** Eight release cases completed; seven valid cases and one failed warm-up retained
 **Created:** 2026-10-11
 **Application source:** fc3f69c
 **Protocol:** [stages-config.json](stages-config.json)
 
-Locate preparation, JavaScript execution/Promise waits, and owned Rust conversion on the real production Angular demo. Record the initial render separately. The eight-case plan compares feature-off and feature-on release binaries at 5 and 20 requests/s, with two independent repetitions. Warm-up is 10 seconds at 20/s, followed by two seconds to settle and 20 seconds of measurement. Each case starts a fresh process. These passing-load candidates do not establish maximum throughput or overload behavior.
+Locate preparation, JavaScript execution/Promise waits, and owned Rust conversion on the real production Angular demo. Record the initial render separately. The eight-case plan compares feature-off and feature-on release binaries at 5 and 20 requests/s, with two independent repetitions. Warm-up is 10 seconds at 20/s with a 16-VU cap, followed by two seconds to settle and 20 seconds of measurement with 128 VUs. Each case starts a fresh process. These passing-load candidates do not establish maximum throughput or overload behavior.
 
 ## Inputs and First Render
 
@@ -29,7 +29,7 @@ python benchmarks/diagnostics/record-stage-build.py --config benchmarks/diagnost
 
 The runner waits for the flushed ready banner without sending HTTP requests. It then measures and correctness-checks exactly one initial Home request; startup failure does not silently become a warm-up retry. The first control interval contains exactly one expected export with ID 1, and all its stages must lie inside that interval. The association relies on controlled ordering and the server's initial counter, rather than a returned request-ID header.
 
-Server first-export time excludes process/module startup. The separately retained .NET first-control wall time includes connection, client construction, receiving and decoding; client initialization varies with run order. It is a different measurement from k6's response duration and should not be used to infer a logging cost. The ordinary Home/About/query/HEAD/404 gates, production artifact checks, warm-up, load, and recovery gates remain in use. Existing browser evidence is reused without claiming a new isolation test.
+Server first-export time excludes process/module startup. OS/filesystem caches are not reset, so a fresh process does not establish a machine/cache cold start. The separately retained .NET first-control wall time includes connection, client construction, receiving and decoding; client initialization varies with run order. It is a different measurement from k6's response duration and should not be used to infer a logging cost. The ordinary Home/About/query/HEAD/404 gates, production artifact checks, warm-up, load, and recovery gates remain in use. Existing browser evidence is reused without claiming a new isolation test.
 
 ## Analysis and Coverage
 
@@ -51,3 +51,9 @@ python benchmarks/diagnostics/analyze-stages.py --all <experiment-directory>
 ```
 
 The full run requires a clean committed checkout. Fresh output paths are mandatory. Stage attempts are not resumed or repeated to replace unfavorable cases; preserve any interrupted attempt. [plot-stages.py](plot-stages.py) generates PNG/SVG figures from the committed summaries, keeping repetitions separate and including only verified stage populations. The full plan does not include 50/s: overload and a direct client/server ID join remain separate investigations.
+
+## Recorded Release Experiment
+
+[Experiment 008](../../docs/experiments/008-runtime-stage-diagnostic.md) and its [retained dataset](../results/2026-10-11-w01-runtime-stages-001/README.md) contain all eight planned cases. Three enabled populations are verified; on-r2-5rps remains invalid because warm-up had a timeout and 22 dropped arrivals. Its observed stage joins are structurally sound, but exact request-population reconciliation is unsupported. A separate valid disabled 20/s case exceeds the exploratory p95 limit. Neither observation was replaced.
+
+The final plot excludes the invalid internal population and marks its client p95 with a gray X. The collection manifest preserves the original plotting source hash; final drawing source and PNG/SVG hashes are recorded separately in verification.json. All 24 compact summary replays preserve the classifications byte for byte. Follow-up CPU, JavaScript-handler/body-buffering, warm-up, and HTTP investigations remain separate steps.
