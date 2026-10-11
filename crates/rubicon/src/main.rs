@@ -4,7 +4,7 @@ use std::{
 };
 
 use axum::{
-    Router,
+    Json, Router,
     extract::{OriginalUri, State},
     http::{HeaderMap, Method, StatusCode},
     response::Response,
@@ -65,11 +65,13 @@ async fn main() -> Result<(), String> {
         .route("/{*path}", get(root))
         .with_state(renderer);
 
-    let app = Router::new().fallback_service(
-        ServeDir::new(browser_path)
-            .append_index_html_on_directories(false)
-            .fallback(ssr),
-    );
+    let app = Router::new()
+        .route("/api/products", get(products))
+        .fallback_service(
+            ServeDir::new(browser_path)
+                .append_index_html_on_directories(false)
+                .fallback(ssr),
+        );
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
@@ -112,6 +114,12 @@ async fn main() -> Result<(), String> {
     server_result.map_err(|error| format!("HTTP server failed: {error}"))?;
 
     Ok(())
+}
+
+async fn products() -> Json<Vec<catalog::Product>> {
+    let products = catalog::list_products().await;
+
+    Json(products)
 }
 
 async fn root(
