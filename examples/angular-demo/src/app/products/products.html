@@ -1,0 +1,11 @@
+<section>
+  <h2>Products</h2>
+
+  <ul>
+    @for (product of products(); track product.id) {
+      <li>{{ product.name }}</li>
+    } @empty {
+      <li>No products available.</li>
+    }
+  </ul>
+</section>
