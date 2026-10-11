@@ -49,6 +49,11 @@ for index in (0, 2, 3, 4, 5):
 axes[3].plot([5, 50], [5, 50], color="#9ca3af", linewidth=1, linestyle=":", zorder=0)
 axes[4].set_ylim(top=100)
 axes[5].set_ylim(top=100)
+verified_overload = sum(r["variant"] == "on" and r["rate"] == 50 and r["internal"]["valid"] for r in data)
+if verified_overload < 2:
+    for index in (1, 2):
+        axes[index].text(.96, .5, f"50/s: {verified_overload}/2 internal runs verified", transform=axes[index].transAxes,
+                         ha="right", va="center", color="#6b7280", fontsize=9)
 variant_legend = [Line2D([0], [0], color=colors[v], label=f"Timing {v}", linewidth=2) for v in ("off", "on")]
 internal_legend = [Line2D([0], [0], color=color, label=label, linewidth=2) for label, color in (("p50", "#047857"), ("p95", "#7e3a94"))]
 axes[0].legend(handles=variant_legend, fontsize=9)

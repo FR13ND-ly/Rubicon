@@ -1,0 +1,110 @@
+{
+  "id": "off-r2-5rps",
+  "variant": "off",
+  "repetition": 2,
+  "offered_rps": 5,
+  "duration_seconds": 20,
+  "nominal_offered": 100,
+  "started": 101,
+  "completed": 101,
+  "correct": 101,
+  "unfinished": 0,
+  "outcomes": {
+    "correct": 101
+  },
+  "dropped": 0,
+  "schedule_residual": -1,
+  "correct_completed_in_window": 100,
+  "correct_rps_in_window": 5,
+  "correct_cohort_rps": 5.05,
+  "correct_completions_after_window": 1,
+  "failure_fraction_of_started": 0,
+  "latency_correct_ms": {
+    "count": 101,
+    "mean": 45.91104653465346,
+    "min": 13.6022,
+    "p50": 36.7424,
+    "p95": 75.3131,
+    "p99": 79.6126,
+    "max": 82.9678
+  },
+  "latency_all_ms": {
+    "count": 101,
+    "mean": 45.91104653465346,
+    "min": 13.6022,
+    "p50": 36.7424,
+    "p95": 75.3131,
+    "p99": 79.6126,
+    "max": 82.9678
+  },
+  "ttfb_correct_ms": {
+    "count": 101,
+    "mean": 45.69943366336632,
+    "min": 13.6022,
+    "p50": 36.7247,
+    "p95": 74.9402,
+    "p99": 78.7291,
+    "max": 82.9678
+  },
+  "blocked_ms": {
+    "count": 101,
+    "mean": 0.7540594059405938,
+    "min": 0,
+    "p50": 0.8176,
+    "p95": 1.4832,
+    "p99": 1.6927,
+    "max": 1.7868
+  },
+  "connecting_ms": {
+    "count": 101,
+    "mean": 0.7135603960396039,
+    "min": 0,
+    "p50": 0.8119,
+    "p95": 1.2697,
+    "p99": 1.5228,
+    "max": 1.5366
+  },
+  "server": {
+    "samples": 38,
+    "sampled_seconds": 19.552,
+    "cpu_ms": 2000,
+    "allocated_cpu_mean_percent": 10.229132569558102,
+    "cpu_ms_per_correct_in_sampled_interval": 20.408163265306122,
+    "working_set_peak_mib": 100.8671875,
+    "private_bytes_peak_mib": 83.328125,
+    "affinity_masks": [
+      1
+    ]
+  },
+  "generator": {
+    "samples": 38,
+    "sampled_seconds": 19.553,
+    "cpu_ms": 93.75,
+    "allocated_cpu_mean_percent": 0.23973303329412365,
+    "cpu_ms_per_correct_in_sampled_interval": null,
+    "working_set_peak_mib": 61.54296875,
+    "private_bytes_peak_mib": 88.6640625,
+    "affinity_masks": [
+      20
+    ]
+  },
+  "generator_headroom": true,
+  "valid": true,
+  "validity_errors": [],
+  "passes_exploratory_limits": true,
+  "recovery_ok": true,
+  "warmup": {
+    "started": 201,
+    "completed": 201,
+    "outcomes": {
+      "correct": 201
+    },
+    "dropped": 0
+  },
+  "phase_start_utc": "2026-10-11T09:25:24.077Z",
+  "artifacts": {
+    "samples_sha256": "8294e7d621ae5e0ffea32b2472a12b4398ec24f0c06b8c05a7c9ac439d99f8ec",
+    "resources_sha256": "c5ebd11d1ffbf49378102cdfb9bfb84f0e321ae1f7801ac7fff0c0b03b97845f",
+    "raw_sha256": "ce8b014e198a9b8333d5f74dc55f7b7cd34110cadc59561fcb42193e4472240a"
+  }
+}

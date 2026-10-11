@@ -1,0 +1,35 @@
+{
+  "status": "verified with preserved internal coverage limitations",
+  "source_revision": "b7046a877d0b2512b182cb1489e7cefd543ee7f6",
+  "continuation_revision": "fb7c7626cb108cc20a8ab8b8991cda257506e16c",
+  "completed_runs": 12,
+  "unchanged_existing_per_run_artifacts": 42,
+  "checked_data_hashes": 60,
+  "byte_identical_replayed_summaries": 24,
+  "client_valid_runs": 12,
+  "internal_coverage_limited_runs": [
+    "on-r1-50rps",
+    "on-r2-50rps"
+  ],
+  "passes_exploratory_limits": 8,
+  "total_nominal_offered": 6000,
+  "total_started": 6008,
+  "total_completed": 6008,
+  "total_correct": 4456,
+  "total_http_503": 1543,
+  "total_transport": 9,
+  "total_dropped_arrivals": 0,
+  "all_shutdowns_normal": true,
+  "all_generator_headroom_and_recovery_checks_passed": true,
+  "resume_changed_input_refusal_fixture": "crates/rubicon/target/diagnostics-resume-guard-001",
+  "all_instrumented_final_drop_counters_zero": true,
+  "verified_instrumented_runs": 4,
+  "recorded_instrumented_session_events": 3477,
+  "request_timeout_warning_counts_match_client_transport_categories": true,
+  "figure_artifacts": {
+    "benchmarks\\diagnostics\\plot.py": "cfeb8498855fd047d329a74b9bfee5d0b47c2a0888dca5f3e2691a3dd1803a5b",
+    "benchmarks\\results\\2026-10-11-w01-diagnostics-002\\diagnostics.png": "fd8f9b0d6f8b29d912e925e56177a7c501256aa54f5a77159a7225f7f2df4c7d",
+    "benchmarks\\results\\2026-10-11-w01-diagnostics-002\\diagnostics.svg": "5ccfa0f94006687800e208664937ab481ee23c2f7ae3a453c12dd61e18db6057"
+  },
+  "figure_generator": "matplotlib 3.10.8; independent runs; unsupported internal windows omitted"
+}

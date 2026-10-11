@@ -1,6 +1,6 @@
 # Renderer Diagnostics
 
-**Status:** Basic collection implemented and test suites verified; measurement coverage and cost evaluation pending
+**Status:** Basic collection verified; exploratory timing experiment completed with declared coverage limits
 **Created:** 2026-10-11
 **Last updated:** 2026-10-11
 **Context:** Follow-up to [performance pilot 006](../experiments/006-ssr-performance-pilot.md)
@@ -45,7 +45,9 @@ The first full-suite attempt was blocked by Windows while the existing server he
 
 Before interpreting timing distributions under load, capture a real Home response, its timing event, and the final zero-loss counter in one controlled session. Add a deliberate exporter-overflow check and reconcile expected versus recorded timing events. Record instrumented versus uninstrumented cost in a separate release experiment.
 
-The diagnostic preflight subsequently exercised real production Home/About/query/HEAD/404 responses, both feature configurations, and actual Windows Ctrl+C delivery. The final instrumented smoke recorded all 109 expected processed events and a zero-loss final counter. The standalone blocked-sink probe reconciled 65 emitted, 3 retained, and 62 dropped records with a two-entry queue. Four altered-log negative checks were rejected, and both smoke runs replayed byte for byte from compact client and timing data. Complete release measurements remain pending.
+The diagnostic preflight subsequently exercised real production Home/About/query/HEAD/404 responses, both feature configurations, and actual Windows Ctrl+C delivery. The final instrumented smoke recorded all 109 expected processed events and a zero-loss final counter. The standalone blocked-sink probe reconciled 65 emitted, 3 retained, and 62 dropped records with a two-entry queue. Four altered-log negative checks were rejected, and both smoke runs replayed byte for byte from compact client and timing data.
+
+[Experiment 007](../experiments/007-renderer-timing-diagnostic.md) completed the 12-case release sequence. Four enabled low-load runs have exact timing coverage and approximately 28 ms median call_export wall time. Both enabled 50/s runs retain unsupported exact coverage because of client timeouts, despite zero final writer-drop counters. All twelve client observations, raw timing records, the interrupted first attempt, and continuation revisions remain preserved. Logging overhead is inconclusive under the short uncontrolled runs. Future measurements need a per-request client/server join, finer intervals, and thread CPU evidence.
 
 The initial eprintln timing block has been replaced by a tracing event. This step preserves its durations and moves sink writes to a separate thread. Later separate export preparation, Promise settlement, JavaScript response.text(), Rust conversion, and HTTP handling, with explicit interval boundaries.
 

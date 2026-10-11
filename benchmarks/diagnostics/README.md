@@ -1,6 +1,6 @@
 # Renderer Timing Diagnostic
 
-**Status:** Harness preflight passed; complete experiment pending
+**Status:** Harness preflight passed; [experiment 007](../../docs/experiments/007-renderer-timing-diagnostic.md) completed with recorded internal coverage limitations
 **Created:** 2026-10-11
 **Application source:** `68bcbb8`
 
@@ -51,7 +51,7 @@ The standalone [overflow probe](overflow-probe.rs) blocks the sink and uses a tw
 
 The first full attempt stopped after eight runs because the analyzer applied the instrumented outcome restriction to the disabled variant, which had one client timeout. Its original data and failed manifest are retained. The restriction was corrected and fixture checks now require a disabled-variant timeout to remain a valid external observation, while an enabled-variant timeout prevents exact internal reconciliation. The load plan, binaries, client script, and application remain the same for the replacement attempt.
 
-The replacement attempt then encountered two real client timeouts in the enabled 50/s run. Its internal summary remains invalid: zero counted writer losses alone does not establish exact coverage. The runner now distinguishes this preserved limitation (analysis exit 2) from a broken analysis process (exit 1), allowing later planned cases to run. Resume is allowed once: it preserves the interrupted manifest, checks all immutable input hashes and the complete original run order, records the continuation revision, and skips only completed cases with both summaries present. Completed runs are never repeated to replace an unfavorable outcome.
+The replacement attempt then encountered five real client timeouts in the enabled 50/s run, with two more timing events than could be explained by correct/control responses. Its internal summary remains invalid: zero counted writer losses alone does not establish exact coverage. The runner now distinguishes this preserved limitation (analysis exit 2) from a broken analysis process (exit 1), allowing later planned cases to run. Resume is allowed once: it preserves the interrupted manifest, checks all immutable input hashes and the complete original run order, records the continuation revision, and skips only completed cases with both summaries present. Completed runs are never repeated to replace an unfavorable outcome.
 
 ```powershell
 cargo run --locked --offline --manifest-path benchmarks/diagnostics/probe/Cargo.toml
@@ -61,3 +61,5 @@ python benchmarks/diagnostics/analyze.py --replay <run-directory>
 ```
 
 Each run preserves compact client samples, resources, compact timing events, both summaries, run metadata, and raw-log hashes. Raw streams/logs and executable files remain local under ignored directories. Replaying from committed compact samples must reproduce summaries. Retain failed or invalidated checks with their reasons.
+
+The completed [replacement sequence](../results/2026-10-11-w01-diagnostics-002/README.md) retains all 12 cases: 8 pass the exploratory limits and 4 overloaded cases fail. Two enabled overload cases have unsupported exact internal coverage because of client timeouts, despite zero writer drops. [plot.py](plot.py) plots all client runs and only verified internal populations using matplotlib 3.10.8. The interrupted first attempt remains separate.

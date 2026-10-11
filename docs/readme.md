@@ -34,6 +34,8 @@ The [exploratory performance pilot](../benchmarks/pilot/README.md) provides a ch
 
 ## Experiments
 
+- [007: Renderer timing and instrumentation cost](experiments/007-renderer-timing-diagnostic.md), Completed 12-case release sequence with disabled/enabled timing variants. All 5/s and 20/s runs passed exploratory limits; 50/s overloaded with HTTP 503 and timeouts. Verified low-load exports have approximately 28 ms median wall time. Two overload internal populations remain unsupported for exact coverage; all failures and the interrupted first attempt are retained. Logging overhead is inconclusive.
+
 - [006: Exploratory SSR performance pilot](experiments/006-ssr-performance-pilot.md), Completed local W-01 load test of release Rust and production Angular Node. All 20 runs had valid accounting and recovery. Node delivered more correct work at lower latency on this page; Rubicon saturated around 31–32 correct responses/s with HTTP 503, despite low mean CPU. Short windows, differing V8 versions, and client concurrency/environmental limits prevent a general or sustained-capacity claim. Compact data, per-run percentiles, resources, hashes, and plots are retained.
 
 - [005: Browser assets and hydration through Rust](experiments/005-browser-assets-hydration.md), Completed temporary check and repository verification. The author selected tower-http 0.7.1; actual development and production Angular builds passed SSR, matching JavaScript/CSS/favicon delivery, HEAD, missing paths, browser interaction, navigation, reload, and warning/error checks. The Rust executable was a debug build; performance evaluation remains pending.
