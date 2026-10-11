@@ -34,7 +34,7 @@ The preparation closure retains errors as a Result so its interval can be logged
 
 For a completed call, the sum of its recorded stages can be smaller than call_export_us. The enclosing interval also contains span setup, event formatting/enqueueing, other bookkeeping and cleanup, and timer rounding. The difference is not a direct logging CPU measurement. A successful processed job now emits four timing events instead of one, which changes instrumentation cost and exporter pressure. Evaluate that cost again in a controlled release comparison.
 
-The current benchmark analyzer reads only coarse render_timing records. It ignores the new stage events and cannot establish their coverage or summarize their distributions. Extend it with a per-request stage join, expected error sequences, and compact replay before a stage experiment. Existing experiment 007 measurements came from the earlier binaries; they contain no stage measurements and remain valid within their declared scope.
+The original benchmark analyzer reads only coarse render_timing records and remains unchanged. The later [stage pipeline](../../benchmarks/diagnostics/stages-README.md) adds a per-request stage join, expected error sequences, compact replay, and a separate initial-render observation. Its preflight verifies complete real smoke sequences and rejects altered logs and changed replay inputs. Existing experiment 007 measurements came from the earlier binaries; they contain no stage measurements and remain valid within their declared scope.
 
 ## Implemented Collection
 
@@ -98,7 +98,7 @@ Execution and waits account for approximately 99.90% of this one call's enclosin
 
 The excerpt does not identify build profile, CPU affinity, warm-up state, or HTTP/content validation. If it was produced by the preceding cargo run command without --release, it used a debug build. It cannot be compared directly with the warmed release distributions in experiment 007 or used as a throughput estimate. The author subsequently confirmed Ctrl+C shutdown with RUBICON_DIAGNOSTICS_DROPPED lines=0; the final counter was reported by the author rather than independently captured in the excerpt. Zero reported writer drops alone does not establish complete stage coverage.
 
-Next, add stage coverage/replay to the analyzer, freeze a release experiment that records the first render separately from warmed requests, and retain per-request stage totals. Split the JavaScript handler from body buffering and record outer HTTP work in later instrumentation steps. Use thread CPU evidence before attributing execution wall time to computation.
+The stage coverage/replay pipeline and [experiment 008](../experiments/008-runtime-stage-diagnostic.md) now record the first render separately from warmed requests. Split the JavaScript handler from body buffering and record outer HTTP work in later instrumentation steps. Use thread CPU evidence before attributing execution wall time to computation.
 
 ## Primary References
 

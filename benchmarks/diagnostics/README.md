@@ -6,7 +6,7 @@
 
 Compare release binaries with render-timing disabled and enabled, using the same production Angular artifacts and the pilot's CPU allocation. Locate queue versus call_export wall time before changing the renderer. This is an exploratory follow-up to [pilot 006](../../docs/experiments/006-ssr-performance-pilot.md), not the full thesis protocol.
 
-The current author implementation also emits [per-stage runtime events](../../docs/guides/renderer-diagnostics.md#runtime-stage-collection). This completed harness analyzes only coarse render_timing records and cannot verify or summarize the new stage records. Add a per-request stage join, sequence/coverage checks, and compact replay in a separate preflight before a stage experiment. Retain experiment 007 binaries and data; use new binary names and output directories for the new source revision.
+The current author implementation also emits [per-stage runtime events](../../docs/guides/renderer-diagnostics.md#runtime-stage-collection). The original analyzer remains unchanged and reads only coarse render_timing records. The separately verified [stage pipeline](stages-README.md) adds per-request joins, sequence/coverage checks, compact replay, retained release binaries, and a separate initial-render control interval. Experiment 007 binaries and data remain retained under their original names.
 
 ## Frozen Plan
 

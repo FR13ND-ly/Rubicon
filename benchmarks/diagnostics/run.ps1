@@ -3,6 +3,8 @@ param(
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
     [string]$K6Path = 'crates/rubicon/target/pilot-tools/k6-v2.3.0/k6-v2.3.0-windows-amd64/k6.exe',
     [Parameter(Mandatory = $true)][string]$PythonPath,
+    [string]$ConfigPath = 'benchmarks/diagnostics/config.json',
+    [switch]$RuntimeStages,
     [switch]$Resume,
     [switch]$Smoke
 )
@@ -16,7 +18,12 @@ if (-not $pilotOutput.StartsWith($pilotRoot + [IO.Path]::DirectorySeparatorChar)
 if ($Resume -and $Smoke) { throw 'Only a complete frozen plan can be resumed.' }
 if ((Test-Path -LiteralPath $pilotOutput) -and -not $Resume) { throw 'Output directory already exists; previous results are never overwritten.' }
 if ($Resume -and -not (Test-Path -LiteralPath $pilotOutput)) { throw 'Resume requires an existing experiment directory.' }
-$pilotConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'config.json') -Raw | ConvertFrom-Json
+$pilotConfigPath = [IO.Path]::GetFullPath((Join-Path $pilotRoot $ConfigPath))
+if (-not $pilotConfigPath.StartsWith($pilotRoot + [IO.Path]::DirectorySeparatorChar)) { throw 'Configuration must remain inside the repository.' }
+$pilotConfig = Get-Content -LiteralPath $pilotConfigPath -Raw | ConvertFrom-Json
+if ($RuntimeStages -and $pilotConfig.runtime_stage_schema -ne 1) { throw 'Stage mode requires an explicit stage configuration.' }
+if (-not $RuntimeStages -and $pilotConfig.PSObject.Properties.Name -contains 'runtime_stage_schema') { throw 'Stage configuration requires -RuntimeStages.' }
+if ($Resume -and $RuntimeStages) { throw 'Stage experiments require a fresh frozen plan; unfinished attempts are preserved.' }
 $pilotV8Binding = [regex]::Match((Get-Content -LiteralPath 'crates/rubicon/Cargo.lock' -Raw), '(?m)^name = "v8"\r?\nversion = "([^"]+)"').Groups[1].Value
 if ($pilotV8Binding -ne $pilotConfig.embedded_v8_binding_version) { throw 'V8 binding changed; refresh the verified engine version before this experiment.' }
 if ($Smoke) {
@@ -36,6 +43,17 @@ if ($LASTEXITCODE -ne 0 -or $pilotK6Version -notmatch ('v' + [regex]::Escape($pi
 $pilotNode = (Get-Command node.exe).Source
 foreach ($variant in @('off', 'on')) {
     if (-not (Test-Path -LiteralPath (Join-Path $pilotRoot $pilotConfig.binary_paths.$variant))) { throw ('Missing release binary: ' + $variant) }
+}
+if ($RuntimeStages) {
+    $stageBuildPath = [IO.Path]::GetFullPath((Join-Path $pilotRoot $pilotConfig.build_manifest))
+    if (-not $stageBuildPath.StartsWith($pilotRoot + [IO.Path]::DirectorySeparatorChar)) { throw 'Build metadata must remain inside the repository.' }
+    $stageBuild = Get-Content -LiteralPath $stageBuildPath -Raw | ConvertFrom-Json
+    if (-not $stageBuild.application_source_revision.StartsWith($pilotConfig.application_source_revision) -or $stageBuild.profile -ne 'release') { throw 'Stage build metadata identifies a different application or profile.' }
+    foreach ($stageArtifact in $stageBuild.hashes) {
+        $stageArtifactPath = [IO.Path]::GetFullPath((Join-Path $pilotRoot $stageArtifact.path))
+        if (-not $stageArtifactPath.StartsWith($pilotRoot + [IO.Path]::DirectorySeparatorChar)) { throw 'Build input must remain inside the repository.' }
+        if ((Get-FileHash -LiteralPath $stageArtifactPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $stageArtifact.sha256) { throw ('Stage build input changed: ' + $stageArtifact.path) }
+    }
 }
 if (-not (Test-Path -LiteralPath $PythonPath)) { throw 'Python executable not found.' }
 if ([Environment]::ProcessorCount -lt 5) { throw 'The configured affinity masks require at least five logical processors.' }
@@ -149,7 +167,8 @@ function Write-PilotSample($Handle, [string]$Role, $Writer) {
     $Writer.Flush()
 }
 
-$pilotHashPaths = @('crates/rubicon/Cargo.lock', 'crates/rubicon/Cargo.toml', 'crates/rubicon/src/main.rs', 'crates/rubicon/src/renderer.rs', 'examples/angular-demo/package-lock.json', $pilotConfig.binary_paths.off, $pilotConfig.binary_paths.on, 'benchmarks/diagnostics/config.json', 'benchmarks/diagnostics/run.ps1', 'benchmarks/diagnostics/console-host.py', 'benchmarks/diagnostics/analyze.py', 'examples/angular-demo/dist/rubicon/server/server.mjs', 'examples/angular-demo/dist/angular-demo/server/server.mjs', 'benchmarks/pilot/config.json', 'benchmarks/pilot/ssr.js', 'benchmarks/pilot/run.ps1', 'benchmarks/pilot/analyze.mjs', 'benchmarks/pilot/node-host.mjs', 'benchmarks/pilot/check-accounting.mjs', 'benchmarks/pilot/plot.py', 'benchmarks/pilot/preflight.json')
+$pilotHashPaths = @('crates/rubicon/Cargo.lock', 'crates/rubicon/Cargo.toml', 'crates/rubicon/src/main.rs', 'crates/rubicon/src/lib.rs', 'crates/rubicon/src/renderer.rs', 'examples/angular-demo/package-lock.json', $pilotConfig.binary_paths.off, $pilotConfig.binary_paths.on, $ConfigPath, 'benchmarks/diagnostics/run.ps1', 'benchmarks/diagnostics/console-host.py', 'benchmarks/diagnostics/analyze.py', 'examples/angular-demo/dist/rubicon/server/server.mjs', 'examples/angular-demo/dist/angular-demo/server/server.mjs', 'benchmarks/pilot/config.json', 'benchmarks/pilot/ssr.js', 'benchmarks/pilot/run.ps1', 'benchmarks/pilot/analyze.mjs', 'benchmarks/pilot/node-host.mjs', 'benchmarks/pilot/check-accounting.mjs', 'benchmarks/pilot/plot.py', 'benchmarks/pilot/preflight.json')
+if ($RuntimeStages) { $pilotHashPaths += @('benchmarks/diagnostics/analyze-stages.py', 'benchmarks/diagnostics/check-stages.py', 'benchmarks/diagnostics/record-stage-build.py', 'benchmarks/diagnostics/plot-stages.py', 'benchmarks/diagnostics/stage-preflight.json', $pilotConfig.build_manifest, 'crates/rubicon/src/http_response.rs', 'crates/rubicon/src/request.rs', 'crates/rubicon/src/response.rs', 'crates/rubicon/js/web.js', 'examples/angular-demo/src/server.rubicon.ts') }
 $pilotArtifacts = @($pilotHashPaths | ForEach-Object { @{ path = $_; sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant() } })
 $pilotBrowserFiles = @('examples/angular-demo/dist/rubicon/browser', 'examples/angular-demo/dist/angular-demo/browser') | ForEach-Object {
     $directory = $_
@@ -221,6 +240,7 @@ try {
         $server = $null; $generator = $null; $writer = $null; $client = $null
         $script:diagnosticsControlCompleted = 0
         $run = @{ id = $runId; variant = $case.variant; rate = $case.rate; repetition = $case.repetition; measurement_seconds = $pilotConfig.measurement_seconds; config = $pilotConfig; source_revision = $pilotRevision; status = 'running' }
+        if ($RuntimeStages) { $run.runtime_stage_schema = 1 }
         Save-PilotJson $run (Join-Path $runDirectory 'run.json')
         try {
             $origin = $pilotConfig.origins.($case.variant)
@@ -231,12 +251,31 @@ try {
             $run.server_pid = $server.server_monitor.process.Id
             $httpHandler = [Net.Http.HttpClientHandler]::new(); $httpHandler.AllowAutoRedirect = $false
             $client = [Net.Http.HttpClient]::new($httpHandler); $client.Timeout = [timespan]::FromSeconds(2)
+            if ($RuntimeStages) {
+                # A flushed ready banner precedes the first HTTP request.
+                # Failed startup attempts must not silently warm the application.
+                $bannerWatch = [Diagnostics.Stopwatch]::StartNew()
+                $bannerPath = Join-Path $rawDirectory 'server.stdout.log'
+                while (-not ((Get-Content -LiteralPath $bannerPath -Raw) -like '*Rubicon is running at*')) {
+                    if ($server.process.HasExited -or $bannerWatch.Elapsed.TotalSeconds -gt 30) { throw 'Server ready banner was not observed.' }
+                    Start-Sleep -Milliseconds 50
+                }
+                $firstStarted = [datetime]::UtcNow.ToString('o')
+                $firstWatch = [Diagnostics.Stopwatch]::StartNew()
+                $firstResponse = Get-PilotResponse $client $origin '/'
+                $firstWatch.Stop()
+                $firstFinished = [datetime]::UtcNow.ToString('o')
+                Assert-PilotPage $firstResponse 'Home'
+                $run.first_request = @{ expected_request_id = '1'; started_utc = $firstStarted; finished_utc = $firstFinished; client_elapsed_ms = $firstWatch.Elapsed.TotalMilliseconds; status = $firstResponse.status; bytes = $firstResponse.bytes; content_gate = 'passed'; association = 'Ordered initial control request; no request-ID response header' }
+                $ready = $true
+            } else {
             $readiness = [Diagnostics.Stopwatch]::StartNew(); $ready = $false
             while ($readiness.Elapsed.TotalSeconds -lt 30) {
                 if ($server.process.HasExited) { throw 'Server exited before readiness.' }
                 try { Assert-PilotPage (Get-PilotResponse $client $origin '/') 'Home'; $ready = $true; break } catch { Start-Sleep -Milliseconds 100 }
             }
             if (-not $ready) { throw 'No correct Home response within the readiness window.' }
+            }
             Assert-PilotPage (Get-PilotResponse $client $origin '/about') 'About'
             Assert-PilotPage (Get-PilotResponse $client $origin '/?sort=asc&page=2') 'Home'
             $head = Get-PilotResponse $client $origin '/' 'HEAD'
@@ -288,6 +327,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw ('Analysis failed: ' + $runId) }
         & $PythonPath (Join-Path $PSScriptRoot 'analyze.py') --run $runDirectory
         if ($LASTEXITCODE -notin @(0, 2)) { throw ('Diagnostic analysis process failed: ' + $runId) }
+        if ($RuntimeStages) {
+            & $PythonPath (Join-Path $PSScriptRoot 'analyze-stages.py') --run $runDirectory
+            if ($LASTEXITCODE -notin @(0, 2)) { throw ('Stage analysis process failed: ' + $runId) }
+        }
         Start-Sleep -Seconds 2
     }
     $pilotManifest.status = 'completed'
@@ -298,3 +341,7 @@ finally { $pilotManifest.finished_utc = [datetime]::UtcNow.ToString('o'); Save-P
 if ($LASTEXITCODE -ne 0) { throw 'Aggregate analysis failed.' }
 & $PythonPath (Join-Path $PSScriptRoot 'analyze.py') --all $pilotOutput
 if ($LASTEXITCODE -ne 0) { throw 'Aggregate diagnostic analysis failed.' }
+if ($RuntimeStages) {
+    & $PythonPath (Join-Path $PSScriptRoot 'analyze-stages.py') --all $pilotOutput
+    if ($LASTEXITCODE -ne 0) { throw 'Aggregate stage analysis failed.' }
+}
