@@ -9,6 +9,9 @@ const QUEUE_CAPACITY: usize = 16;
 struct RenderJob {
     request: RenderRequest,
     reply: oneshot::Sender<Result<RenderResponse, String>>,
+
+    #[cfg(feature = "render-timing")]
+    queued_at: std::time::Instant,
 }
 
 #[derive(Clone)]
@@ -46,7 +49,13 @@ impl Renderer {
         let (reply, response) = oneshot::channel();
 
         self.sender
-            .try_send(RenderJob { request, reply })
+            .try_send(RenderJob {
+                request,
+                reply,
+
+                #[cfg(feature = "render-timing")]
+                queued_at: std::time::Instant::now(),
+            })
             .map_err(|error| match error {
                 mpsc::error::TrySendError::Full(_) => RenderError::Busy,
                 mpsc::error::TrySendError::Closed(_) => RenderError::Unavailable,
@@ -101,9 +110,32 @@ fn run_worker(
                 continue;
             }
 
+            #[cfg(feature = "render-timing")]
+            let processing_started = std::time::Instant::now();
+
             let result = runtime
                 .call_export::<_, RenderResponse>(module_id, "render", &job.request)
                 .await;
+
+            #[cfg(feature = "render-timing")]
+            {
+                let processing_finished = std::time::Instant::now();
+
+                let queue_us = processing_started.duration_since(job.queued_at).as_micros();
+
+                let call_export_us = processing_finished
+                    .duration_since(processing_started)
+                    .as_micros();
+
+                tracing::info!(
+                    target: "rubicon::render_timing",
+                    request_id = %job.request.request_id,
+                    queue_us,
+                    call_export_us,
+                    ok = result.is_ok(),
+                    "render_timing",
+                );
+            }
 
             let _ = job.reply.send(result);
         }
@@ -136,7 +168,13 @@ mod tests {
             assert!(
                 renderer
                     .sender
-                    .try_send(RenderJob { request, reply })
+                    .try_send(RenderJob {
+                        request,
+                        reply,
+
+                        #[cfg(feature = "render-timing")]
+                        queued_at: std::time::Instant::now(),
+                    })
                     .is_ok()
             );
             pending_replies.push(response);

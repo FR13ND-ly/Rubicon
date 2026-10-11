@@ -7,6 +7,7 @@ This documentation supports the design, implementation, and evaluation of Rubico
 - [How to write documentation](guides/how-to-document.md): document types, naming, status, and writing order.
 - [Performance evaluation](guides/performance-evaluation.md): benchmark design, execution, and interpretation.
 - [Git workflow](guides/git-workflow.md): focused changes, review, and reproducible experiment revisions.
+- [Renderer diagnostics](guides/renderer-diagnostics.md): implemented timing boundaries and bounded log collection, test evidence, and remaining measurement checks after pilot 006.
 
 ## Templates
 

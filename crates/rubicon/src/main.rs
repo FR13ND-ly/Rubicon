@@ -18,6 +18,26 @@ static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    #[cfg(feature = "render-timing")]
+    let (timing_guard, timing_dropped) = {
+        let (writer, guard) = tracing_appender::non_blocking::NonBlockingBuilder::default()
+            .buffered_lines_limit(1024)
+            .lossy(true)
+            .thread_name("rubicon-diagnostics")
+            .finish(std::io::stderr());
+
+        let dropped = writer.error_counter();
+
+        tracing_subscriber::fmt()
+            .with_writer(writer)
+            .with_ansi(false)
+            .with_target(false)
+            .with_max_level(tracing::Level::INFO)
+            .try_init()
+            .map_err(|error| format!("Diagnostic logging initialization failed: {error}"))?;
+
+        (guard, dropped)
+    };
     deno_core::JsRuntime::init_platform(None);
 
     let module_path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -45,9 +65,39 @@ async fn main() -> Result<(), String> {
 
     println!("Rubicon is running at {APPLICATION_ORIGIN}");
 
-    axum::serve(listener, app)
-        .await
-        .map_err(|error| format!("HTTP server failed: {error}"))?;
+    let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
+
+    let server = axum::serve(listener, app).with_graceful_shutdown(async move {
+        let _ = shutdown_receiver.await;
+    });
+
+    let server = std::future::IntoFuture::into_future(server);
+    tokio::pin!(server);
+
+    let server_result = tokio::select! {
+        result = &mut server => result,
+
+        signal = tokio::signal::ctrl_c() => {
+            signal.map_err(|error| {
+                format!("Shutdown signal failed: {error}")
+            })?;
+
+            let _ = shutdown_sender.send(());
+            server.await
+        }
+    };
+
+    #[cfg(feature = "render-timing")]
+    {
+        drop(timing_guard);
+
+        eprintln!(
+            "RUBICON_DIAGNOSTICS_DROPPED lines={}",
+            timing_dropped.dropped_lines(),
+        );
+    }
+
+    server_result.map_err(|error| format!("HTTP server failed: {error}"))?;
 
     Ok(())
 }
