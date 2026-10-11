@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-11",
+  "application_revision": "68bcbb8c96ff6d9cf71c78f7d9844a90416587a3",
+  "status": "passed",
+  "smoke_paths": [
+    "crates/rubicon/target/diagnostics-smoke-001",
+    "crates/rubicon/target/diagnostics-smoke-002"
+  ],
+  "final_smoke": [
+    {
+      "run": "off-r1-20rps",
+      "client_valid": true,
+      "correct": 60,
+      "http_failures": 0,
+      "dropped_arrivals": 0,
+      "recorded_events": 0,
+      "expected_events": 0,
+      "dropped_log_records": [],
+      "recovery_ok": true,
+      "client_and_timing_replay_byte_identical": true
+    },
+    {
+      "run": "on-r1-20rps",
+      "client_valid": true,
+      "correct": 61,
+      "http_failures": 0,
+      "dropped_arrivals": 0,
+      "recorded_events": 109,
+      "expected_events": 109,
+      "dropped_log_records": [
+        0
+      ],
+      "recovery_ok": true,
+      "client_and_timing_replay_byte_identical": true
+    }
+  ],
+  "overflow_probe": {
+    "emitted": 65,
+    "recorded": 3,
+    "dropped": 62,
+    "producer_returned_while_sink_was_blocked": true
+  },
+  "negative_analysis_checks": [
+    {
+      "case": "missing-event",
+      "rejected": true,
+      "reason": "Processed-event coverage mismatch: expected 108, found 107"
+    },
+    {
+      "case": "duplicate-event",
+      "rejected": true,
+      "reason": "Processed-event coverage mismatch: expected 108, found 109; Duplicate request identifiers in timing records"
+    },
+    {
+      "case": "nonzero-drop",
+      "rejected": true,
+      "reason": "Missing, duplicated, or nonzero final drop counter"
+    },
+    {
+      "case": "missing-counter",
+      "rejected": true,
+      "reason": "Missing, duplicated, or nonzero final drop counter"
+    }
+  ],
+  "binary_hashes": {
+    "off": "39069a6308a6321d503be84fe82f7cb4700a3dbbeed5623ac58d306859c8f7d8",
+    "on": "7fdbc978ddd1e5dddd8904c0ceee213a0882299f1da6287bcf7401c7312b15a7"
+  },
+  "original_pilot_binary_preserved_sha256": "9bbe3542224822cb6fb99b4b91bc54e24a87af9156087529d06f55266978b73c",
+  "scope": "Smoke checks validate plumbing, not performance; complete experiment remains pending"
+}

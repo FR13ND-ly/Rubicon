@@ -28,7 +28,7 @@ On Ctrl+C, main signals Axum to stop accepting connections and awaits its HTTP s
 
 The current dependency graph enables Tokio's signal feature through deno_core's full feature. Declare signal explicitly in Rubicon's Tokio dependency when refining its feature list, so direct signal usage does not depend on that transitive configuration.
 
-The existing pilot runner forcibly kills its servers. Adapt that lifecycle before relying on end-of-process diagnostics: an abrupt termination can bypass guard cleanup. A missing final counter or lost/missing timing records makes a complete internal timing distribution unsupported; it does not erase separately valid client observations.
+The existing pilot runner forcibly kills its servers. The separate [diagnostic harness](../../benchmarks/diagnostics/README.md) now uses a verified private console for normal Ctrl+C shutdown and rejects forced exits. Its preflight passed exact event coverage and zero-loss checks. An abrupt termination can bypass guard cleanup. A missing final counter or lost/missing timing records makes a complete internal timing distribution unsupported; it does not erase separately valid client observations.
 
 ## Verification on 2026-10-11
 
@@ -44,6 +44,8 @@ Repository verification used the updated Cargo.lock:
 The first full-suite attempt was blocked by Windows while the existing server held debug/rubicon.exe open. After the author confirmed stopping the server, both complete suites passed. The author's terminal output from the manual Ctrl+C check was not captured by the agent. Local full-suite logs are retained under ignored target/render-timing-full-default-tests.log and target/render-timing-full-feature-tests.log. The existing LNK4098 linker warning remains; an incremental-cache hard-link warning also appeared and Cargo fell back to copying files.
 
 Before interpreting timing distributions under load, capture a real Home response, its timing event, and the final zero-loss counter in one controlled session. Add a deliberate exporter-overflow check and reconcile expected versus recorded timing events. Record instrumented versus uninstrumented cost in a separate release experiment.
+
+The diagnostic preflight subsequently exercised real production Home/About/query/HEAD/404 responses, both feature configurations, and actual Windows Ctrl+C delivery. The final instrumented smoke recorded all 109 expected processed events and a zero-loss final counter. The standalone blocked-sink probe reconciled 65 emitted, 3 retained, and 62 dropped records with a two-entry queue. Four altered-log negative checks were rejected, and both smoke runs replayed byte for byte from compact client and timing data. Complete release measurements remain pending.
 
 The initial eprintln timing block has been replaced by a tracing event. This step preserves its durations and moves sink writes to a separate thread. Later separate export preparation, Promise settlement, JavaScript response.text(), Rust conversion, and HTTP handling, with explicit interval boundaries.
 
