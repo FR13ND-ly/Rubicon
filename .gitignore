@@ -1,4 +1,7 @@
 # Rust build artifacts; applies to target directories at any depth.
 target/
 
+# Full k6 point streams and process logs remain local; compact samples are versioned.
+benchmarks/results/**/raw/
+
 # Cargo.lock remains versioned for reproducible project builds.

@@ -1,0 +1,144 @@
+{
+  "application_base_revision": "c825d3277ab50d7113419f1ede3497d1368522c9",
+  "date": "2026-10-11",
+  "smoke": [
+    {
+      "warmup": {
+        "started": 79,
+        "completed": 79,
+        "outcomes": {
+          "correct": 79
+        },
+        "dropped": 122
+      },
+      "measurement": {
+        "started": 61,
+        "completed": 61,
+        "dropped": 0,
+        "correct": 61
+      },
+      "notes": "Invalid warm-up at 100/s; retained, excluded from performance interpretation",
+      "valid": false,
+      "sha256": "d26c7aac58b468eca35a0eccd5108d8de179d0cc5b68f97d7b4103286bce850e",
+      "path": "crates/rubicon/target/pilot-smoke-001/rubicon-r1-20rps/summary.json",
+      "recovery_ok": true
+    },
+    {
+      "warmup": {
+        "started": 199,
+        "completed": 199,
+        "outcomes": {
+          "correct": 199
+        },
+        "dropped": 1
+      },
+      "measurement": {
+        "started": 61,
+        "completed": 61,
+        "dropped": 0,
+        "correct": 61
+      },
+      "notes": "Invalid warm-up at 100/s; retained, excluded from performance interpretation",
+      "valid": false,
+      "sha256": "c799f10aa5cd68a55e5f8c9a748658647ab41fa0218511b9375fff7cbdd75476",
+      "path": "crates/rubicon/target/pilot-smoke-001/node-r1-20rps/summary.json",
+      "recovery_ok": true
+    },
+    {
+      "warmup": {
+        "started": 41,
+        "completed": 41,
+        "outcomes": {
+          "correct": 41
+        },
+        "dropped": 0
+      },
+      "measurement": {
+        "started": 61,
+        "completed": 61,
+        "dropped": 0,
+        "correct": 61
+      },
+      "notes": "Warm-up 20/s; valid harness check, not performance evidence",
+      "valid": true,
+      "sha256": "1b31263d6fa02927f05f14e6c1b518df74edcfd799ec0502a10fe1345f5cd971",
+      "path": "crates/rubicon/target/pilot-smoke-002/rubicon-r1-20rps/summary.json",
+      "recovery_ok": true
+    },
+    {
+      "warmup": {
+        "started": 41,
+        "completed": 41,
+        "outcomes": {
+          "correct": 41
+        },
+        "dropped": 0
+      },
+      "measurement": {
+        "started": 61,
+        "completed": 61,
+        "dropped": 0,
+        "correct": 61
+      },
+      "notes": "Warm-up 20/s; valid harness check, not performance evidence",
+      "valid": true,
+      "sha256": "815d6602a206a11932bce35fc8fbace9b689eaa4cb542c7977a8f7fdb60f7d53",
+      "path": "crates/rubicon/target/pilot-smoke-002/node-r1-20rps/summary.json",
+      "recovery_ok": true
+    }
+  ],
+  "status": "passed",
+  "browser": {
+    "about_navigation_and_reload": "passed",
+    "evidence": [
+      {
+        "sha256": "c6e0b193b242fb604b8cd8489fecbdfa12868c9020b61e003a0970c9ca0a0411",
+        "path": "docs/assets/angular-pilot-release-counter.jpg"
+      },
+      {
+        "sha256": "9e8da7cbbd19549830b044bb3d83098ee9dea08b6619a6204633802173e03a8a",
+        "path": "docs/assets/angular-pilot-node-counter.jpg"
+      }
+    ],
+    "captured_warnings_errors": [],
+    "builds": "Angular production, zero prerendered routes",
+    "variants": [
+      "Rust release, http://127.0.0.1:3000",
+      "Node production, http://127.0.0.1:4000"
+    ],
+    "return_home_counter": 0,
+    "counter": [
+      0,
+      1,
+      2
+    ]
+  },
+  "accounting": {
+    "status": "passed",
+    "expected": {
+      "correct": 4,
+      "incorrect_content": 4,
+      "http_503": 3
+    },
+    "actual": {
+      "correct": 4,
+      "incorrect_content": 4,
+      "http_503": 3
+    },
+    "started": 11,
+    "completed": 11
+  },
+  "replay": "Both replacement smoke summaries reproduced byte for byte from compact samples",
+  "plotting": {
+    "matplotlib": "3.10.8",
+    "dependency_location": "ignored target/pilot-tools/plot-deps, without global installation"
+  },
+  "release_build": {
+    "jobs": 4,
+    "offline_resolution": true,
+    "nonfatal_warning": "LNK4098",
+    "environment_retry": "Restricted native archive download/archive overwrite failed; host execution completed without source changes",
+    "profile": "release"
+  },
+  "schema_version": 1
+}

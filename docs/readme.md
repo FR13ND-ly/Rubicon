@@ -29,6 +29,8 @@ A separate Angular 22.2.2 application serves Home and About pages through its co
 
 Update this index when document status changes or new documents are added.
 
+The [exploratory performance pilot](../benchmarks/pilot/README.md) now provides a checked local load runner, request accounting, process-resource sampling, compact replayable data, and plotting. The full benchmark protocol remains a draft with additional correctness and experimental controls required.
+
 ## Experiments
 
 - [005: Browser assets and hydration through Rust](experiments/005-browser-assets-hydration.md), Completed temporary check and repository verification. The author selected tower-http 0.7.1; actual development and production Angular builds passed SSR, matching JavaScript/CSS/favicon delivery, HEAD, missing paths, browser interaction, navigation, reload, and warning/error checks. The Rust executable was a debug build; performance evaluation remains pending.

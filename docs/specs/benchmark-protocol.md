@@ -2,8 +2,8 @@
 
 **Status:** Draft
 **Created:** 2026-10-09
-**Last updated:** 2026-10-09
-**Implementation:** Not started
+**Last updated:** 2026-10-11
+**Implementation:** Exploratory W-01 harness checked; full protocol evaluation pending
 
 ## Purpose and Context
 
@@ -12,6 +12,8 @@ This protocol defines a reproducible performance comparison between Angular SSR 
 The primary objective is the highest sustained rate of correct responses that meets declared latency, failure, and memory limits within a fixed resource budget. Secondary metrics include CPU cost, startup time, queue behavior, and sustained stability.
 
 No performance results are established by this document. Exact workload parameters, versions, hardware, thresholds, and durations must be frozen in the experiment manifest before a comparison is interpreted.
+
+The [local pilot](../../benchmarks/pilot/README.md) has a separate frozen configuration and explicit deviations: short windows, two repetitions, uncontrolled laptop conditions, observed memory without a cap, and no personalized-data isolation gate. It is intended to select later experiments. Its completion must not be presented as satisfaction of this full protocol or proof of sustained capacity.
 
 ## Scope
 
