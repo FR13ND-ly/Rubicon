@@ -10,6 +10,9 @@ deno_core::extension!(
     esm_entry_point = "ext:rubicon_web/web.js",
     esm = [dir "js", "web.js"],
 );
+#[cfg(feature = "render-timing")]
+mod diagnostics;
+
 mod http_response;
 mod renderer;
 mod request;
@@ -26,20 +29,29 @@ pub struct JavaScriptRuntime {
 
 impl JavaScriptRuntime {
     pub fn new() -> Result<Self, String> {
+        let extensions = vec![
+            deno_webidl::deno_webidl::init(),
+            deno_web::deno_web::init(
+                Arc::new(deno_web::BlobStore::default()),
+                None,
+                false,
+                Default::default(),
+            ),
+            deno_net::deno_net::init(None, None),
+            deno_fetch::deno_fetch::init(Default::default()),
+            rubicon_web::init(),
+        ];
+
+        #[cfg(feature = "render-timing")]
+        let extensions = {
+            let mut extensions = extensions;
+            extensions.push(diagnostics::extension());
+            extensions
+        };
+
         let inner = JsRuntime::try_new(RuntimeOptions {
             module_loader: Some(Rc::new(FsModuleLoader)),
-            extensions: vec![
-                deno_webidl::deno_webidl::init(),
-                deno_web::deno_web::init(
-                    Arc::new(deno_web::BlobStore::default()),
-                    None,
-                    false,
-                    Default::default(),
-                ),
-                deno_net::deno_net::init(None, None),
-                deno_fetch::deno_fetch::init(Default::default()),
-                rubicon_web::init(),
-            ],
+            extensions,
             ..Default::default()
         })
         .map_err(|error| format!("Runtime initialization failed: {error}"))?;

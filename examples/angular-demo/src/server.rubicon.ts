@@ -19,15 +19,36 @@ type RubiconResponse = {
   body: string;
 };
 
+type AdapterTiming = {
+  record(stage: 1 | 2, elapsedMs: number, ok: boolean): boolean;
+};
+
+const adapterTiming = (
+  globalThis as typeof globalThis & {
+    __rubiconAdapterTiming?: AdapterTiming;
+  }
+).__rubiconAdapterTiming;
+
 export async function render(
   request: RubiconRequest,
 ): Promise<RubiconResponse> {
-  const response = await reqHandler(
-    new Request(request.url, {
-      method: request.method,
-      headers: new Headers(request.headers),
-    }),
-  );
+  const webRequest = new Request(request.url, {
+    method: request.method,
+    headers: new Headers(request.headers),
+  });
+
+  const angularStarted = adapterTiming ? performance.now() : 0;
+  let angularOk = false;
+  let response: Response | null;
+
+  try {
+    response = await reqHandler(webRequest);
+    angularOk = true;
+  } finally {
+    if (adapterTiming) {
+      adapterTiming.record(1, performance.now() - angularStarted, angularOk);
+    }
+  }
 
   if (response === null) {
     return {
@@ -45,9 +66,18 @@ export async function render(
     headers.push(['set-cookie', cookie]);
   }
 
-  return {
-    status: response.status,
-    headers,
-    body: await response.text(),
-  };
+  const bodyStarted = adapterTiming ? performance.now() : 0;
+  let bodyOk = false;
+  let body: string;
+
+  try {
+    body = await response.text();
+    bodyOk = true;
+  } finally {
+    if (adapterTiming) {
+      adapterTiming.record(2, performance.now() - bodyStarted, bodyOk);
+    }
+  }
+
+  return { status: response.status, headers, body };
 }
