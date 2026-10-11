@@ -1,10 +1,30 @@
 import { AngularAppEngine, createRequestHandler } from '@angular/ssr';
+import type {
+  ProductsDataSource,
+  ProductsRequestContext,
+} from './app/catalog/products.contract';
 
 const angularApp = new AngularAppEngine();
 
-export const reqHandler = createRequestHandler((request: Request) =>
-  angularApp.handle(request),
-);
+export const reqHandler = createRequestHandler((request: Request) => {
+  const catalog = (
+    globalThis as typeof globalThis & {
+      readonly __rubiconDemoCatalog?: ProductsDataSource;
+    }
+  ).__rubiconDemoCatalog;
+
+  if (!catalog || typeof catalog.listProducts !== 'function') {
+    throw new Error('Rubicon native catalog is not registered');
+  }
+
+  const context: ProductsRequestContext = {
+    products: {
+      listProducts: () => catalog.listProducts(),
+    },
+  };
+
+  return angularApp.handle(request, context);
+});
 
 type RubiconRequest = {
   request_id: string;

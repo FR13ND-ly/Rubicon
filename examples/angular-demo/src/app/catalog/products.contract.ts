@@ -6,3 +6,7 @@ export interface Product {
 export interface ProductsDataSource {
   listProducts(): Promise<readonly Product[]>;
 }
+
+export interface ProductsRequestContext {
+  readonly products: ProductsDataSource;
+}
