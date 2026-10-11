@@ -29,7 +29,13 @@ pub struct JavaScriptRuntime {
 
 impl JavaScriptRuntime {
     pub fn new() -> Result<Self, String> {
-        let extensions = vec![
+        Self::with_extensions(Vec::new())
+    }
+
+    pub fn with_extensions(
+        application_extensions: Vec<deno_core::Extension>,
+    ) -> Result<Self, String> {
+        let mut extensions = vec![
             deno_webidl::deno_webidl::init(),
             deno_web::deno_web::init(
                 Arc::new(deno_web::BlobStore::default()),
@@ -43,11 +49,9 @@ impl JavaScriptRuntime {
         ];
 
         #[cfg(feature = "render-timing")]
-        let extensions = {
-            let mut extensions = extensions;
-            extensions.push(diagnostics::extension());
-            extensions
-        };
+        extensions.push(diagnostics::extension());
+
+        extensions.extend(application_extensions);
 
         let inner = JsRuntime::try_new(RuntimeOptions {
             module_loader: Some(Rc::new(FsModuleLoader)),

@@ -3,7 +3,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rubicon::{RenderError, RenderRequest, RenderResponse, Renderer};
+use rubicon::{JavaScriptRuntime, RenderError, RenderRequest, RenderResponse, Renderer};
+
+#[path = "../src/catalog.rs"]
+mod catalog;
+
+#[path = "../src/catalog_native.rs"]
+mod catalog_native;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), String> {
@@ -17,8 +23,13 @@ async fn main() -> Result<(), String> {
         "renderer_fetch_objects.mjs",
         "renderer_performance.mjs",
     ] {
-        check_renderer_fixture(fixture_name).await?;
+        check_renderer_fixture(fixture_name, JavaScriptRuntime::new).await?;
     }
+
+    check_renderer_fixture("renderer_native_catalog.mjs", || {
+        JavaScriptRuntime::with_extensions(vec![catalog_native::extension()])
+    })
+    .await?;
 
     check_renderer_idle_timers().await?;
 
@@ -85,14 +96,20 @@ async fn check_renderer_idle_timers() -> Result<(), String> {
     Ok(())
 }
 
-async fn check_renderer_fixture(fixture_name: &str) -> Result<(), String> {
+async fn check_renderer_fixture(
+    fixture_name: &str,
+    create_runtime: fn() -> Result<JavaScriptRuntime, String>,
+) -> Result<(), String> {
     let module_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures")
         .join(fixture_name);
 
-    let renderer = tokio::time::timeout(Duration::from_secs(5), Renderer::start(module_path))
-        .await
-        .expect("Worker initialization exceeded the test time limit")?;
+    let renderer = tokio::time::timeout(
+        Duration::from_secs(5),
+        Renderer::start_with_runtime(module_path, create_runtime),
+    )
+    .await
+    .expect("Worker initialization exceeded the test time limit")?;
 
     let first_url = "http://127.0.0.1:3000/products?sort=asc&page=2";
     let second_url = "http://127.0.0.1:3000/search?q='quoted'&page=1";

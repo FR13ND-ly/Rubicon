@@ -10,8 +10,11 @@ use axum::{
     response::Response,
     routing::get,
 };
-use rubicon::{RenderError, RenderRequest, Renderer, into_http_response};
+use rubicon::{JavaScriptRuntime, RenderError, RenderRequest, Renderer, into_http_response};
 use tower_http::services::ServeDir;
+
+mod catalog;
+mod catalog_native;
 
 #[cfg(windows)]
 mod windows_timer;
@@ -49,7 +52,10 @@ async fn main() -> Result<(), String> {
     let module_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/angular-demo/dist/rubicon/server/server.mjs");
 
-    let renderer = Renderer::start(module_path).await?;
+    let renderer = Renderer::start_with_runtime(module_path, || {
+        JavaScriptRuntime::with_extensions(vec![catalog_native::extension()])
+    })
+    .await?;
 
     let browser_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/angular-demo/dist/rubicon/browser");

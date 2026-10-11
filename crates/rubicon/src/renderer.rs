@@ -31,12 +31,22 @@ pub enum RenderError {
 
 impl Renderer {
     pub async fn start(module_path: PathBuf) -> Result<Self, String> {
+        Self::start_with_runtime(module_path, JavaScriptRuntime::new).await
+    }
+
+    pub async fn start_with_runtime<F>(
+        module_path: PathBuf,
+        create_runtime: F,
+    ) -> Result<Self, String>
+    where
+        F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
+    {
         let (sender, receiver) = mpsc::channel(QUEUE_CAPACITY);
         let (ready_sender, ready_receiver) = oneshot::channel();
 
         let _worker = thread::Builder::new()
             .name("rubicon-renderer".to_owned())
-            .spawn(move || run_worker(module_path, receiver, ready_sender))
+            .spawn(move || run_worker(module_path, receiver, ready_sender, create_runtime))
             .map_err(|error| format!("Worker thread creation failed: {error}"))?;
 
         let startup_result = ready_receiver
@@ -71,11 +81,14 @@ impl Renderer {
     }
 }
 
-fn run_worker(
+fn run_worker<F>(
     module_path: PathBuf,
     mut receiver: mpsc::Receiver<RenderJob>,
     ready: oneshot::Sender<Result<(), String>>,
-) {
+    create_runtime: F,
+) where
+    F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
+{
     let executor = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -89,7 +102,7 @@ fn run_worker(
 
     executor.block_on(async move {
         let initialization = async {
-            let mut runtime = JavaScriptRuntime::new()?;
+            let mut runtime = create_runtime()?;
             let module_id = runtime.load_main_module(&module_path).await?;
 
             Ok::<_, String>((runtime, module_id))
