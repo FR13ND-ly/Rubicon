@@ -2629,6 +2629,16 @@ version = "0.1.0"
 [[package]]
 name = "rubicon-demo-server"
 version = "0.1.0"
+dependencies = [
+ "axum",
+ "deno_core",
+ "rubicon",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "rustc-hash"
