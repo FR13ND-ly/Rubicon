@@ -1,6 +1,9 @@
 use std::{
     path::Path,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use axum::{
@@ -10,7 +13,9 @@ use axum::{
     response::Response,
     routing::get,
 };
-use rubicon::{JavaScriptRuntime, RenderError, RenderRequest, Renderer, into_http_response};
+use rubicon::{
+    JavaScriptRuntime, RenderError, RenderRequest, Renderer, ServerConfig, into_http_response,
+};
 use tower_http::services::ServeDir;
 
 mod catalog;
@@ -19,8 +24,11 @@ mod catalog_native;
 #[cfg(windows)]
 mod windows_timer;
 
-const APPLICATION_ORIGIN: &str = "http://127.0.0.1:3000";
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
+struct ServerState {
+    renderer: Renderer,
+    origin: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -49,35 +57,43 @@ async fn main() -> Result<(), String> {
     };
     deno_core::JsRuntime::init_platform(None);
 
-    let module_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/angular-demo/dist/rubicon/server/server.mjs");
+    let config = ServerConfig {
+        bind: ([127, 0, 0, 1], 3000).into(),
+        origin: "http://127.0.0.1:3000".to_owned(),
+        server_entry: Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/angular-demo/dist/rubicon/server/server.mjs"),
+        browser_dir: Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/angular-demo/dist/rubicon/browser"),
+    };
 
-    let renderer = Renderer::start_with_runtime(module_path, || {
+    let renderer = Renderer::start_with_runtime(config.server_entry, || {
         JavaScriptRuntime::with_extensions(vec![catalog_native::extension()])
     })
     .await?;
 
-    let browser_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/angular-demo/dist/rubicon/browser");
+    let state = Arc::new(ServerState {
+        renderer,
+        origin: config.origin,
+    });
 
     let ssr = Router::new()
         .route("/", get(root))
         .route("/{*path}", get(root))
-        .with_state(renderer);
+        .with_state(Arc::clone(&state));
 
     let app = Router::new()
         .route("/api/products", get(products))
         .fallback_service(
-            ServeDir::new(browser_path)
+            ServeDir::new(config.browser_dir)
                 .append_index_html_on_directories(false)
                 .fallback(ssr),
         );
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .map_err(|error| format!("HTTP listener creation failed: {error}"))?;
 
-    println!("Rubicon is running at {APPLICATION_ORIGIN}");
+    println!("Rubicon is running at {}", state.origin);
 
     let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
 
@@ -123,7 +139,7 @@ async fn products() -> Json<Vec<catalog::Product>> {
 }
 
 async fn root(
-    State(renderer): State<Renderer>,
+    State(state): State<Arc<ServerState>>,
     OriginalUri(uri): OriginalUri,
     method: Method,
     headers: HeaderMap,
@@ -133,7 +149,7 @@ async fn root(
         .map(|value| value.as_str())
         .unwrap_or("/");
 
-    let url = format!("{APPLICATION_ORIGIN}{path_and_query}");
+    let url = format!("{}{path_and_query}", state.origin);
     let request_id = next_request_id(&NEXT_REQUEST_ID)?;
 
     let request = RenderRequest {
@@ -143,7 +159,7 @@ async fn root(
         headers: request_headers(&headers)?,
     };
 
-    match renderer.render(request).await {
+    match state.renderer.render(request).await {
         Ok(rendered) => into_http_response(rendered).map_err(|error| {
             eprintln!("Response conversion failed [request_id={request_id}]: {error}");
 
