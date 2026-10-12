@@ -18,12 +18,14 @@ mod http_response;
 mod renderer;
 mod request;
 mod response;
+mod server;
 
 pub use config::ServerConfig;
 pub use http_response::into_http_response;
 pub use renderer::{RenderError, Renderer};
 pub use request::RenderRequest;
 pub use response::RenderResponse;
+pub use server::serve;
 
 pub struct JavaScriptRuntime {
     inner: JsRuntime,
