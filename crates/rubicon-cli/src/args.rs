@@ -21,6 +21,9 @@ pub struct ServeArgs {
 
     #[arg(long, value_enum, default_value = "rubicon")]
     pub backend: Backend,
+
+    #[arg(long, help = "Show launch configuration without starting the server")]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
