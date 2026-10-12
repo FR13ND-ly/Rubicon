@@ -23,3 +23,11 @@ serde = { version = "=1.0.229", features = ["derive"] }
 tracing = { version = "=0.1.44", optional = true }
 tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["fmt", "std"], optional = true }
 tracing-appender = { version = "=0.2.5", default-features = false, optional = true }
+
+[dev-dependencies]
+tokio = { version = "=1.53.2", features = ["time"] }
+
+[[test]]
+name = "catalog_native"
+path = "tests/catalog_native.rs"
+harness = false
