@@ -1,0 +1,13 @@
+[server]
+bind = "127.0.0.1:3000"
+origin = "http://127.0.0.1:3000"
+
+[rubicon]
+executable = "../../target/release/rubicon-demo-server"
+server_entry = "dist/rubicon/server/server.mjs"
+browser_dir = "dist/rubicon/browser"
+
+[node]
+executable = "node"
+server_entry = "dist/angular-demo/server/server.mjs"
+browser_dir = "dist/angular-demo/browser"
