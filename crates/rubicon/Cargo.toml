@@ -5,11 +5,7 @@ edition = "2024"
 
 [features]
 default = []
-render-timing = [
-    "dep:tracing",
-    "dep:tracing-subscriber",
-    "dep:tracing-appender",
-]
+render-timing = ["dep:tracing"]
 
 [dependencies]
 axum = "=0.8.9"
@@ -22,8 +18,6 @@ tokio = { version = "=1.53.2", features = ["rt", "macros", "rt-multi-thread", "n
 serde = { version = "=1.0.229", features = ["derive"] }
 tower-http = { version = "=0.7.1", features = ["fs"] }
 tracing = { version = "=0.1.44", optional = true }
-tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["fmt", "std"], optional = true }
-tracing-appender = { version = "=0.2.5", default-features = false, optional = true }
 
 [[test]]
 name = "renderer_errors"

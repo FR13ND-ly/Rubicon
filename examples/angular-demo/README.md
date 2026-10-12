@@ -60,10 +60,10 @@ npm.cmd run build -- --configuration production,rubicon
 Stop a running Rubicon host before replacing its generated files, then restart it so the persistent runtime loads the selected configuration. From the repository root:
 
 ```powershell
-cargo run --locked --manifest-path crates/rubicon/Cargo.toml
+cargo run --locked -p rubicon-demo-server
 ```
 
-Open `http://127.0.0.1:3000/`. The repository executable currently fixes this origin and the dist/rubicon artifact paths. The verification used a debug Rust executable with both Angular configurations; a production Angular build does not imply a release Rust binary or a completed performance comparison.
+Open `http://127.0.0.1:3000/`. The `rubicon-demo-server` executable in `rust-server` fixes this origin and the dist/rubicon artifact paths. The verification used a debug Rust executable with both Angular configurations; a production Angular build does not imply a release Rust binary or a completed performance comparison.
 
 Configuration order matters: development settings apply first, then the Rubicon entrypoint and output path. The command passed on 2026-10-10 with zero prerendered routes. The output contains matching browser files and a neutral `server/server.mjs` exporting `reqHandler`. That handler takes a Web `Request` and returns a `Response` or `null` for a route it does not handle. It does not start a listener or serve browser files.
 

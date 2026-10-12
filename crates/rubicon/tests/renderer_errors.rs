@@ -5,12 +5,6 @@ use std::{
 
 use rubicon::{JavaScriptRuntime, RenderError, RenderRequest, RenderResponse, Renderer};
 
-#[path = "../src/catalog.rs"]
-mod catalog;
-
-#[path = "../src/catalog_native.rs"]
-mod catalog_native;
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), String> {
     deno_core::JsRuntime::init_platform(None);
@@ -25,11 +19,6 @@ async fn main() -> Result<(), String> {
     ] {
         check_renderer_fixture(fixture_name, JavaScriptRuntime::new).await?;
     }
-
-    check_renderer_fixture("renderer_native_catalog.mjs", || {
-        JavaScriptRuntime::with_extensions(vec![catalog_native::extension()])
-    })
-    .await?;
 
     check_renderer_idle_timers().await?;
 

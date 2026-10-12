@@ -17,7 +17,7 @@ npm.cmd run build -- --configuration development,rubicon
 ```
 
 ```text
-cargo run --locked --manifest-path crates/rubicon/Cargo.toml
+cargo run --locked -p rubicon-demo-server
 ```
 
 The library's `JavaScriptRuntime` owns one embedded runtime, evaluates synchronous scripts through `execute_i64`, loads a main module, and calls exports through `call_export<TArgument, TResult>`, using serializable arguments and owned deserializable results. The public [Renderer](crates/rubicon/src/renderer.rs) accepts an owned [RenderRequest](crates/rubicon/src/request.rs), containing `request_id: String`, `url: String`, `method: String`, and `headers: Vec<(String, String)>`, and sends it with each job to a dedicated thread that owns the runtime and loads the module once. The worker borrows the request, converts it directly to a V8 object through `serde_v8::to_v8`, and passes it to JavaScript. The worker selects `RenderResponse` as the result type and transports that owned value through the reply channel. Its fixed queue holds up to 16 waiting jobs, with one render active at a time. Cloning `Renderer` shares access to this worker.
