@@ -1,5 +1,6 @@
 import argparse
 import csv
+import ctypes
 import hashlib
 import json
 import math
@@ -13,6 +14,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+from contextlib import contextmanager
 from html import unescape
 from pathlib import Path
 from urllib.request import ProxyHandler, build_opener
@@ -28,6 +30,69 @@ PRODUCTS = [
     {"id": "monitor", "name": "Monitor"},
 ]
 PRODUCTS_STATE_KEY = "rubicon-demo:products:v1"
+
+
+@contextmanager
+def keep_system_awake():
+    # A thread-scoped request; it neither changes the power plan nor keeps the
+    # display on. Windows removes it when this thread exits, even after a crash.
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.SetThreadExecutionState.argtypes = [ctypes.c_uint32]
+    kernel.SetThreadExecutionState.restype = ctypes.c_uint32
+    previous = kernel.SetThreadExecutionState(0x80000001)
+    if not previous:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        if not kernel.SetThreadExecutionState(previous | 0x80000001):
+            raise ctypes.WinError(ctypes.get_last_error())
+        yield
+    finally:
+        if not kernel.SetThreadExecutionState(previous):
+            raise ctypes.WinError(ctypes.get_last_error())
+
+
+def power_status():
+    class Status(ctypes.Structure):
+        _fields_ = [
+            ("ac", ctypes.c_ubyte), ("battery_flags", ctypes.c_ubyte),
+            ("battery_percent", ctypes.c_ubyte), ("battery_saver", ctypes.c_ubyte),
+            ("seconds_remaining", ctypes.c_uint32), ("full_seconds", ctypes.c_uint32),
+        ]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetSystemPowerStatus.argtypes = [ctypes.POINTER(Status)]
+    kernel.GetSystemPowerStatus.restype = ctypes.c_int
+    status = Status()
+    if not kernel.GetSystemPowerStatus(ctypes.byref(status)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return {"ac_connected": status.ac, "battery_percent": status.battery_percent,
+            "battery_saver": status.battery_saver}
+
+
+def suspension_clock_ms():
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetTickCount64.restype = ctypes.c_uint64
+    kernel.QueryUnbiasedInterruptTime.argtypes = [ctypes.POINTER(ctypes.c_uint64)]
+    kernel.QueryUnbiasedInterruptTime.restype = ctypes.c_int
+    awake_ticks = ctypes.c_uint64()
+    if not kernel.QueryUnbiasedInterruptTime(ctypes.byref(awake_ticks)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return kernel.GetTickCount64() - awake_ticks.value / 10000
+
+
+def process_timer_policy(process):
+    class State(ctypes.Structure):
+        _fields_ = [("version", ctypes.c_uint32), ("control", ctypes.c_uint32),
+                    ("state", ctypes.c_uint32)]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetProcessInformation.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+    kernel.GetProcessInformation.restype = ctypes.c_int
+    state = State(1, 0, 0)
+    if not kernel.GetProcessInformation(process._handle, 4, ctypes.byref(state), ctypes.sizeof(state)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return {"control_mask": state.control, "state_mask": state.state,
+            "timer_resolution_explicitly_honored": bool(state.control & 4) and not bool(state.state & 4)}
 
 
 def ensure_port_free(port):
@@ -164,6 +229,8 @@ def run_case(server, round_number, args, raw):
     environment["PORT"] = str(port)
     environment["NODE_ENV"] = "production"
     environment["RUBICON_WINDOWS_TIMER_RESOLUTION"] = args.rubicon_timer
+    power_before = power_status()
+    suspend_before = suspension_clock_ms()
 
     with server_log.open("w", encoding="utf-8") as log:
         process = subprocess.Popen(
@@ -177,6 +244,13 @@ def run_case(server, round_number, args, raw):
 
         try:
             wait_until_ready(process, port, server_log)
+            timer_policy = process_timer_policy(process)
+            (raw / f"{prefix}-environment.json").write_text(
+                json.dumps({"power": power_before, "timer_policy": timer_policy}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            if name == "rubicon" and args.rubicon_timer == "1ms" and not timer_policy["timer_resolution_explicitly_honored"]:
+                raise RuntimeError("Rubicon did not explicitly honor timer resolution. Rebuild the release binary.")
             validate_page(url, args.path)
 
             if args.warmup:
@@ -194,6 +268,11 @@ def run_case(server, round_number, args, raw):
                 )
 
             validate_page(url, args.path)
+            power_after = power_status()
+            if any(power_before[key] != power_after[key] for key in ("ac_connected", "battery_saver")):
+                raise RuntimeError("Power source or battery-saver mode changed during the case; results retained but invalid.")
+            if suspension_clock_ms() - suspend_before > 1000:
+                raise RuntimeError("Windows suspended during the case; results retained but invalid.")
             return rows
         finally:
             if process.poll() is None:
@@ -259,6 +338,8 @@ def write_manifest(output, args, servers, artifacts):
         "platform": platform.platform(),
         "processor": platform.processor(),
         "logical_cpus": os.cpu_count(),
+        "power": power_status(),
+        "power_scheme": command_output(["powercfg.exe", "/getactivescheme"]),
         "python": sys.version,
         "node": command_output([servers[1]["command"][0], "--version"]),
         "curl": command_output(["curl.exe", "--version"]).splitlines()[0],
@@ -275,6 +356,7 @@ def write_manifest(output, args, servers, artifacts):
             "percentiles": "pooled samples, nearest-rank; median uses statistics.median",
             "correctness": "HTML and TransferState/API gates before and after each case; HTTP status for every measured request",
             "cold_start": "not measured; correctness request precedes warmup",
+            "sleep_prevention": "thread-scoped system-required request for the run; display and power plan unchanged",
             "order": "Rubicon/Node in odd rounds, Node/Rubicon in even rounds",
         },
         "sha256": {
@@ -433,7 +515,8 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        with keep_system_awake():
+            main()
     except KeyboardInterrupt:
         raise SystemExit("Comparison interrupted.")
     except (
