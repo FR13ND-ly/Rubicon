@@ -8,6 +8,7 @@ import express from 'express';
 import { join } from 'node:path';
 import type { ProductsRequestContext } from './app/catalog/products.contract';
 import { listProducts } from './catalog.node';
+import { attachShutdown } from './shutdown.node';
 
 const configuredBrowserDir = process.env['RUBICON_BROWSER_DIR'];
 
@@ -54,6 +55,14 @@ app.use((req, res, next) => {
  * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
  */
 if (isMainModule(import.meta.url) || process.env['pm_id']) {
+  const configuredManaged = process.env['RUBICON_MANAGED'];
+
+  if (configuredManaged !== undefined && configuredManaged !== '1') {
+    process.exitCode = 1;
+    throw new Error('RUBICON_MANAGED must be 1 when set.');
+  }
+
+  const managed = configuredManaged === '1';
   const host = process.env['HOST'];
   const configuredPort = process.env['PORT'] ?? '4000';
   const port = Number(configuredPort);
@@ -81,6 +90,8 @@ if (isMainModule(import.meta.url) || process.env['pm_id']) {
     const urlHost = displayHost.includes(':') ? `[${displayHost}]` : displayHost;
 
     console.log(`Node Express server listening on http://${urlHost}:${boundPort}`);
+
+    attachShutdown(server, managed);
   });
 }
 
