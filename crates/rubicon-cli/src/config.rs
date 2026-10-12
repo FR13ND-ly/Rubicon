@@ -5,6 +5,7 @@ use std::{
 };
 
 use serde::Deserialize;
+use url::Url;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -47,6 +48,7 @@ pub fn load(path: &Path) -> Result<ApplicationConfig, String> {
         )
     })?;
 
+    application.server.origin = validate_origin(&application.server.origin)?;
     let base_dir = absolute_path
         .parent()
         .ok_or_else(|| "Configuration path has no parent directory.".to_owned())?;
@@ -95,4 +97,35 @@ fn resolve_executable(base_dir: &Path, value: &Path) -> Result<PathBuf, String> 
     };
 
     Ok(resolved)
+}
+
+fn validate_origin(value: &str) -> Result<String, String> {
+    if value
+        .chars()
+        .any(|character| character.is_whitespace() || character.is_control())
+    {
+        return Err("server.origin cannot contain whitespace or control characters.".to_owned());
+    }
+
+    let (scheme, authority) = value
+        .split_once("://")
+        .ok_or_else(|| "server.origin must start with http:// or https://.".to_owned())?;
+
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return Err("server.origin must use HTTP or HTTPS.".to_owned());
+    }
+
+    let authority = authority.strip_suffix('/').unwrap_or(authority);
+
+    if authority.is_empty()
+        || authority
+            .chars()
+            .any(|character| matches!(character, '/' | '\\' | '?' | '#' | '@'))
+    {
+        return Err("server.origin must contain only scheme, host, and optional port.".to_owned());
+    }
+
+    let parsed = Url::parse(value).map_err(|error| format!("Invalid server.origin: {error}"))?;
+
+    Ok(parsed.origin().ascii_serialization())
 }
