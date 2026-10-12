@@ -13,11 +13,13 @@ deno_core::extension!(
 #[cfg(feature = "render-timing")]
 mod diagnostics;
 
+mod config;
 mod http_response;
 mod renderer;
 mod request;
 mod response;
 
+pub use config::ServerConfig;
 pub use http_response::into_http_response;
 pub use renderer::{RenderError, Renderer};
 pub use request::RenderRequest;
