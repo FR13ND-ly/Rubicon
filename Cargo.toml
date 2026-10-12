@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "crates/rubicon",
+    "crates/rubicon-cli",
+    "examples/angular-demo/rust-server",
+]
+resolver = "3"
