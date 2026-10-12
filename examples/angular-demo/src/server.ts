@@ -9,7 +9,13 @@ import { join } from 'node:path';
 import type { ProductsRequestContext } from './app/catalog/products.contract';
 import { listProducts } from './catalog.node';
 
-const browserDistFolder = join(import.meta.dirname, '../browser');
+const configuredBrowserDir = process.env['RUBICON_BROWSER_DIR'];
+
+if (configuredBrowserDir === '') {
+  throw new Error('RUBICON_BROWSER_DIR cannot be empty.');
+}
+
+const browserDistFolder = configuredBrowserDir ?? join(import.meta.dirname, '../browser');
 
 const app = express();
 const angularApp = new AngularNodeAppEngine();
@@ -48,13 +54,33 @@ app.use((req, res, next) => {
  * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
  */
 if (isMainModule(import.meta.url) || process.env['pm_id']) {
-  const port = process.env['PORT'] || 4000;
-  app.listen(port, (error) => {
+  const host = process.env['HOST'];
+  const configuredPort = process.env['PORT'] ?? '4000';
+  const port = Number(configuredPort);
+
+  if (host === '') {
+    process.exitCode = 1;
+    throw new Error('HOST cannot be empty.');
+  }
+
+  if (!/^\d+$/.test(configuredPort) || !Number.isInteger(port) || port > 65535) {
+    process.exitCode = 1;
+    throw new Error('PORT must be an integer between 0 and 65535.');
+  }
+
+  const server = app.listen({ port, host }, (error) => {
     if (error) {
+      process.exitCode = 1;
       throw error;
     }
 
-    console.log(`Node Express server listening on http://localhost:${port}`);
+    const address = server.address();
+    const boundPort = address !== null && typeof address === 'object' ? address.port : port;
+
+    const displayHost = host ?? 'localhost';
+    const urlHost = displayHost.includes(':') ? `[${displayHost}]` : displayHost;
+
+    console.log(`Node Express server listening on http://${urlHost}:${boundPort}`);
   });
 }
 
