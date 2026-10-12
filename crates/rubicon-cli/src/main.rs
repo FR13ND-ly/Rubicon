@@ -1,12 +1,14 @@
 mod args;
 mod config;
+mod control;
 mod launcher;
 
 use clap::Parser;
 
 use args::{Cli, Commands};
 
-fn main() -> Result<(), String> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), String> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -16,7 +18,7 @@ fn main() -> Result<(), String> {
             let command = launcher::prepare(&application, options.backend, &options.config)?;
 
             if !options.dry_run {
-                return Err("Server launch is not connected yet. Use --dry-run.".to_owned());
+                return launcher::run(command, options.managed).await;
             }
 
             println!("Backend: {:?}", options.backend);

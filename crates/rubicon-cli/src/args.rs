@@ -24,6 +24,9 @@ pub struct ServeArgs {
 
     #[arg(long, help = "Show launch configuration without starting the server")]
     pub dry_run: bool,
+
+    #[arg(long, help = "Also stop when standard input closes (for automation)")]
+    pub managed: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
