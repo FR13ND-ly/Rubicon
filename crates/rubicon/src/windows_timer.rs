@@ -87,14 +87,12 @@ unsafe extern "system" {
     fn timeEndPeriod(period: u32) -> u32;
 }
 
-/// Keeps the Windows timer-resolution request active for the server lifetime.
-pub(super) struct TimerResolutionGuard {
+pub struct TimerResolutionGuard {
     previous_policy: PowerThrottlingState,
 }
 
 impl TimerResolutionGuard {
-    /// Defaults to 1 ms; `default` disables Rubicon's resolution request.
-    pub(super) fn from_environment() -> Result<Option<Self>, String> {
+    pub fn from_environment() -> Result<Option<Self>, String> {
         match env::var(CONFIGURATION_VARIABLE) {
             Ok(value) if value == "default" => return Ok(None),
             Ok(value) if value == "1ms" => {}

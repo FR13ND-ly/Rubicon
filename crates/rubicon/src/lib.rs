@@ -20,12 +20,18 @@ mod request;
 mod response;
 mod server;
 
+#[cfg(windows)]
+mod windows_timer;
+
 pub use config::ServerConfig;
 pub use http_response::into_http_response;
 pub use renderer::{RenderError, Renderer};
 pub use request::RenderRequest;
 pub use response::RenderResponse;
 pub use server::serve;
+
+#[cfg(windows)]
+pub use windows_timer::TimerResolutionGuard;
 
 pub struct JavaScriptRuntime {
     inner: JsRuntime,

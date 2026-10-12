@@ -3,16 +3,16 @@ use std::path::Path;
 use axum::{Json, Router, routing::get};
 use rubicon::{JavaScriptRuntime, ServerConfig, serve};
 
+#[cfg(windows)]
+use rubicon::TimerResolutionGuard;
+
 mod catalog;
 mod catalog_native;
-
-#[cfg(windows)]
-mod windows_timer;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
     #[cfg(windows)]
-    let _timer_resolution = windows_timer::TimerResolutionGuard::from_environment()?;
+    let _timer_resolution = TimerResolutionGuard::from_environment()?;
 
     #[cfg(feature = "render-timing")]
     let (timing_guard, timing_dropped) = {
