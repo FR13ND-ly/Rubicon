@@ -35,6 +35,31 @@ def wait_for_server(process, output_path, backend):
 
     raise RuntimeError("Server startup exceeded 20 seconds.")
 
+def run_k6(k6, url, requests, phase):
+    print(f"\n{phase}: {requests} requests", flush=True)
+
+    max_duration_s = requests * 10 + 15
+
+    result = subprocess.run(
+        [
+            k6,
+            "run",
+            "--no-usage-report",
+            "--vus",
+            "1",
+            "--iterations",
+            str(requests),
+            "--duration",
+            f"{max_duration_s}s",
+            "--env",
+            f"TARGET_URL={url}",
+            str(SCRIPT),
+        ],
+        cwd=ROOT,
+        timeout=max_duration_s + 45,
+    )
+
+    return result.returncode
 
 def main():
     parser = argparse.ArgumentParser()
@@ -48,7 +73,16 @@ def main():
         type=Path,
         default=ROOT / "examples/angular-demo/rubicon.toml",
     )
+    parser.add_argument("--warmup", type=int, default=20)
+    parser.add_argument("--requests", type=int, default=100)
+
     args = parser.parse_args()
+
+    if args.warmup < 0:
+        parser.error("--warmup must be zero or greater")
+
+    if args.requests < 1:
+        parser.error("--requests must be at least 1")
 
     config_path = args.config.resolve()
     config = tomllib.loads(config_path.read_text(encoding="utf-8"))
@@ -90,18 +124,19 @@ def main():
         try:
             wait_for_server(process, output_path, args.backend)
 
-            result = subprocess.run(
-                [
-                    k6,
-                    "run",
-                    "--no-usage-report",
-                    "--env",
-                    f"TARGET_URL={url}",
-                    str(SCRIPT),
-                ],
-                cwd=ROOT,
-                timeout=30,
-            )
+            exit_code = 0
+
+            for phase, requests in [
+                ("Warmup", args.warmup),
+                ("Measurement", args.requests),
+            ]:
+                if requests == 0:
+                    continue
+
+                exit_code = run_k6(k6, url, requests, phase)
+
+                if exit_code != 0:
+                    break
         finally:
             process.stdin.close()
             server_code = process.wait(timeout=15)
@@ -109,7 +144,7 @@ def main():
     if server_code != 0:
         raise RuntimeError(f"Server shutdown failed; check {error_path}")
 
-    return result.returncode
+    return exit_code
 
 
 if __name__ == "__main__":
