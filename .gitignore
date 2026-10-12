@@ -3,5 +3,6 @@ target/
 
 # Benchmark results and process logs remain local.
 /benchmarks/results/
+/benchmarks/**/__pycache__/
 
 # Cargo.lock remains versioned for reproducible project builds.
