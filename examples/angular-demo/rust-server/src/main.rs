@@ -8,6 +8,7 @@ use rubicon::TimerResolutionGuard;
 
 mod catalog;
 mod catalog_native;
+mod shutdown;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -45,15 +46,13 @@ async fn main() -> Result<(), String> {
 
     let application_routes = Router::new().route("/api/products", get(products));
 
+    let shutdown = shutdown::signal()?;
+
     let server_result = serve(
         config,
         application_routes,
         || JavaScriptRuntime::with_extensions(vec![catalog_native::extension()]),
-        async {
-            tokio::signal::ctrl_c()
-                .await
-                .map_err(|error| format!("Shutdown signal failed: {error}"))
-        },
+        shutdown,
     )
     .await;
 
