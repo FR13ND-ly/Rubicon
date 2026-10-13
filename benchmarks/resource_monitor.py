@@ -193,7 +193,7 @@ class ResourceMonitor:
             }
         )
 
-    def save(self, path, phase, backend, requests, exit_code, error=None):
+    def save(self, path, phase, backend, requests, exit_code, error=None, vus=1):
         duration = self.samples[-1]["elapsed_s"] - self.samples[0]["elapsed_s"]
         summary = {}
         for name, group in self.groups.items():
@@ -226,6 +226,7 @@ class ResourceMonitor:
             "phase": phase,
             "backend": backend,
             "requested_requests": requests,
+            "vus": vus,
             "k6_exit_code": exit_code,
             "error": error,
             "duration_s": duration,
