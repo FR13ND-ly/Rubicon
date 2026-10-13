@@ -23,3 +23,8 @@ tracing = { version = "=0.1.44", optional = true }
 name = "renderer_errors"
 path = "tests/renderer_errors.rs"
 harness = false
+
+[[test]]
+name = "renderer_concurrency"
+path = "tests/renderer_concurrency.rs"
+harness = false

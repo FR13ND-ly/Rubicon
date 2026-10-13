@@ -2,6 +2,10 @@
 bind = "127.0.0.1:3000"
 origin = "http://127.0.0.1:3000"
 
+[renderer]
+max_in_flight = 16
+queue_capacity = 16
+
 [rubicon]
 executable = "../../target/release/rubicon-demo-server"
 server_entry = "dist/rubicon/server/server.mjs"

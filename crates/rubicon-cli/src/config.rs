@@ -13,6 +13,36 @@ pub struct ApplicationConfig {
     pub server: ServerSettings,
     pub rubicon: BackendSettings,
     pub node: BackendSettings,
+    #[serde(default)]
+    pub renderer: RendererSettings,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RendererSettings {
+    pub max_in_flight: usize,
+    pub queue_capacity: usize,
+}
+
+impl Default for RendererSettings {
+    fn default() -> Self {
+        Self {
+            max_in_flight: 16,
+            queue_capacity: 16,
+        }
+    }
+}
+
+impl RendererSettings {
+    fn validate(&self) -> Result<(), String> {
+        if self.max_in_flight == 0 {
+            return Err("renderer.max_in_flight must be at least 1.".to_owned());
+        }
+        if self.queue_capacity == 0 || self.queue_capacity > tokio::sync::Semaphore::MAX_PERMITS {
+            return Err("renderer.queue_capacity is outside the supported range.".to_owned());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,6 +79,7 @@ pub fn load(path: &Path) -> Result<ApplicationConfig, String> {
     })?;
 
     application.server.origin = validate_origin(&application.server.origin)?;
+    application.renderer.validate()?;
     let base_dir = absolute_path
         .parent()
         .ok_or_else(|| "Configuration path has no parent directory.".to_owned())?;
@@ -128,4 +159,59 @@ fn validate_origin(value: &str) -> Result<String, String> {
     let parsed = Url::parse(value).map_err(|error| format!("Invalid server.origin: {error}"))?;
 
     Ok(parsed.origin().ascii_serialization())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ApplicationConfig, RendererSettings};
+
+    const BASE: &str = r#"
+        [server]
+        bind = "127.0.0.1:3000"
+        origin = "http://127.0.0.1:3000"
+        [rubicon]
+        executable = "server"
+        server_entry = "server.mjs"
+        browser_dir = "browser"
+        [node]
+        executable = "node"
+        server_entry = "server.mjs"
+        browser_dir = "browser"
+    "#;
+
+    #[test]
+    fn old_config_gets_defaults_and_explicit_renderer_settings_override_them() {
+        let defaults: ApplicationConfig = toml::from_str(BASE).unwrap();
+        assert_eq!(defaults.renderer.max_in_flight, 16);
+        assert_eq!(defaults.renderer.queue_capacity, 16);
+        let configured: ApplicationConfig = toml::from_str(&format!(
+            "{BASE}\n[renderer]\nmax_in_flight = 1\nqueue_capacity = 3\n",
+        ))
+        .unwrap();
+        assert_eq!(configured.renderer.max_in_flight, 1);
+        assert_eq!(configured.renderer.queue_capacity, 3);
+        assert!(configured.renderer.validate().is_ok());
+    }
+
+    #[test]
+    fn renderer_rejects_zero_overflow_and_unknown_fields() {
+        for settings in [
+            RendererSettings {
+                max_in_flight: 0,
+                queue_capacity: 16,
+            },
+            RendererSettings {
+                max_in_flight: 16,
+                queue_capacity: 0,
+            },
+            RendererSettings {
+                max_in_flight: 16,
+                queue_capacity: usize::MAX,
+            },
+        ] {
+            assert!(settings.validate().is_err());
+        }
+        assert!(toml::from_str::<RendererSettings>("max_inflight = 4").is_err());
+        assert!(toml::from_str::<RendererSettings>("max_in_flight = -1").is_err());
+    }
 }

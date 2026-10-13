@@ -1,7 +1,12 @@
 use deno_core::op2;
 
 #[op2(fast)]
-fn op_rubicon_adapter_timing(stage: u32, elapsed_ms: f64, ok: bool) -> bool {
+fn op_rubicon_adapter_timing(
+    #[string] request_id: &str,
+    stage: u32,
+    elapsed_ms: f64,
+    ok: bool,
+) -> bool {
     let stage = match stage {
         1 => "angular_handle",
         2 => "body_read",
@@ -15,6 +20,7 @@ fn op_rubicon_adapter_timing(stage: u32, elapsed_ms: f64, ok: bool) -> bool {
 
     tracing::info!(
         target: "rubicon::adapter_timing",
+        request_id,
         stage,
         elapsed_us = elapsed_us.floor() as u64,
         ok,

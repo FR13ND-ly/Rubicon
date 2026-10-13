@@ -36,11 +36,24 @@ pub fn prepare(
         .env("RUBICON_SERVER_ENTRY", &settings.server_entry)
         .env("RUBICON_BROWSER_DIR", &settings.browser_dir);
 
-    if let Backend::Node = backend {
-        command
-            .arg(&settings.server_entry)
-            .env("HOST", application.server.bind.ip().to_string())
-            .env("PORT", application.server.bind.port().to_string());
+    match backend {
+        Backend::Rubicon => {
+            command
+                .env(
+                    "RUBICON_MAX_IN_FLIGHT",
+                    application.renderer.max_in_flight.to_string(),
+                )
+                .env(
+                    "RUBICON_QUEUE_CAPACITY",
+                    application.renderer.queue_capacity.to_string(),
+                );
+        }
+        Backend::Node => {
+            command
+                .arg(&settings.server_entry)
+                .env("HOST", application.server.bind.ip().to_string())
+                .env("PORT", application.server.bind.port().to_string());
+        }
     }
 
     Ok(command)
@@ -110,5 +123,56 @@ pub async fn run(command: Command, managed: bool) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!("Server exited unsuccessfully: {status}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prepare;
+    use crate::{
+        args::Backend,
+        config::{ApplicationConfig, BackendSettings, RendererSettings, ServerSettings},
+    };
+    use std::{collections::BTreeMap, path::Path};
+
+    #[test]
+    fn renderer_settings_are_scoped_to_the_rust_child() {
+        let backend = || BackendSettings {
+            executable: "server".into(),
+            server_entry: "server.mjs".into(),
+            browser_dir: "browser".into(),
+        };
+        let application = ApplicationConfig {
+            server: ServerSettings {
+                bind: "127.0.0.1:3100".parse().unwrap(),
+                origin: "http://127.0.0.1:3100".to_owned(),
+            },
+            rubicon: backend(),
+            node: backend(),
+            renderer: RendererSettings {
+                max_in_flight: 4,
+                queue_capacity: 7,
+            },
+        };
+        for (backend, expected) in [(Backend::Rubicon, true), (Backend::Node, false)] {
+            let command = prepare(&application, backend, Path::new("rubicon.toml")).unwrap();
+            let variables: BTreeMap<_, _> = command
+                .get_envs()
+                .map(|(key, value)| {
+                    (
+                        key.to_string_lossy().into_owned(),
+                        value.unwrap().to_string_lossy().into_owned(),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                variables.get("RUBICON_MAX_IN_FLIGHT").map(String::as_str),
+                expected.then_some("4")
+            );
+            assert_eq!(
+                variables.get("RUBICON_QUEUE_CAPACITY").map(String::as_str),
+                expected.then_some("7")
+            );
+        }
     }
 }

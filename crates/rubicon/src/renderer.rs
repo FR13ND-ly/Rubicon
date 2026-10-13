@@ -1,13 +1,10 @@
-use std::{path::PathBuf, thread};
+use crate::PendingExport;
+use deno_core::v8;
+use std::{future::poll_fn, path::PathBuf, task::Poll, thread};
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{JavaScriptRuntime, RenderRequest, RenderResponse};
-
-#[cfg(feature = "render-timing")]
-use tracing::Instrument;
-
-const QUEUE_CAPACITY: usize = 16;
+use crate::{JavaScriptRuntime, RenderRequest, RenderResponse, RendererConfig};
 
 struct RenderJob {
     request: RenderRequest,
@@ -29,6 +26,18 @@ pub enum RenderError {
     Failed(String),
 }
 
+#[cfg(feature = "render-timing")]
+fn record_render_timing(job: &RenderJob, started: std::time::Instant, ok: bool) {
+    tracing::info!(
+        target: "rubicon::render_timing",
+        request_id = %job.request.request_id,
+        queue_us = started.duration_since(job.queued_at).as_micros(),
+        call_export_us = started.elapsed().as_micros(),
+        ok,
+        "render_timing",
+    );
+}
+
 impl Renderer {
     pub async fn start(module_path: PathBuf) -> Result<Self, String> {
         Self::start_with_runtime(module_path, JavaScriptRuntime::new).await
@@ -41,12 +50,32 @@ impl Renderer {
     where
         F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
     {
-        let (sender, receiver) = mpsc::channel(QUEUE_CAPACITY);
+        Self::start_with_config(module_path, RendererConfig::default(), create_runtime).await
+    }
+
+    pub async fn start_with_config<F>(
+        module_path: PathBuf,
+        config: RendererConfig,
+        create_runtime: F,
+    ) -> Result<Self, String>
+    where
+        F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
+    {
+        config.validate()?;
+        let (sender, receiver) = mpsc::channel(config.queue_capacity);
         let (ready_sender, ready_receiver) = oneshot::channel();
 
         let _worker = thread::Builder::new()
             .name("rubicon-renderer".to_owned())
-            .spawn(move || run_worker(module_path, receiver, ready_sender, create_runtime))
+            .spawn(move || {
+                run_worker(
+                    module_path,
+                    receiver,
+                    ready_sender,
+                    create_runtime,
+                    config.max_in_flight,
+                )
+            })
             .map_err(|error| format!("Worker thread creation failed: {error}"))?;
 
         let startup_result = ready_receiver
@@ -86,6 +115,7 @@ fn run_worker<F>(
     mut receiver: mpsc::Receiver<RenderJob>,
     ready: oneshot::Sender<Result<(), String>>,
     create_runtime: F,
+    max_in_flight: usize,
 ) where
     F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
 {
@@ -120,64 +150,114 @@ fn run_worker<F>(
         if ready.send(Ok(())).is_err() {
             return;
         }
-
-        loop {
-            let job = tokio::select! {
-                biased;
-
-                result = runtime.drive_background_tasks() => {
-                    if let Err(error) = result {
-                        eprintln!("{error}");
-                    }
-                    return;
+        struct ActiveCall {
+            job: RenderJob,
+            pending: PendingExport,
+            #[cfg(feature = "render-timing")]
+            started: std::time::Instant,
+            #[cfg(feature = "render-timing")]
+            span: tracing::Span,
+        }
+        enum Event {
+            Job(RenderJob),
+            Completed(usize, Result<v8::Global<v8::Value>, String>),
+            Closed,
+            Quiescent,
+            Failed(String),
+        }
+        fn poll_completed(active: &mut [ActiveCall], cx: &mut std::task::Context<'_>) -> Option<Event> {
+            for (index, call) in active.iter_mut().enumerate() {
+                #[cfg(feature = "render-timing")]
+                let state = call.span.in_scope(|| call.pending.as_mut().poll(cx));
+                #[cfg(not(feature = "render-timing"))]
+                let state = call.pending.as_mut().poll(cx);
+                if let Poll::Ready(result) = state {
+                    return Some(Event::Completed(index, result));
                 }
-
-                job = receiver.recv() => job,
-            };
-
-            let Some(job) = job else {
+            }
+            None
+        }
+        let mut active = Vec::<ActiveCall>::new();
+        let mut closed = false;
+        loop {
+            if closed && active.is_empty() {
                 break;
-            };
-
-            if job.reply.is_closed() {
-                continue;
             }
-
-            #[cfg(feature = "render-timing")]
-            let processing_started = std::time::Instant::now();
-
-            let call = runtime.call_export::<_, RenderResponse>(module_id, "render", &job.request);
-
-            #[cfg(feature = "render-timing")]
-            let call = call.instrument(tracing::info_span!(
-                target: "rubicon::runtime_timing",
-                "render",
-                request_id = %job.request.request_id,
-            ));
-
-            let result = call.await;
-
-            #[cfg(feature = "render-timing")]
-            {
-                let processing_finished = std::time::Instant::now();
-
-                let queue_us = processing_started.duration_since(job.queued_at).as_micros();
-
-                let call_export_us = processing_finished
-                    .duration_since(processing_started)
-                    .as_micros();
-
-                tracing::info!(
-                    target: "rubicon::render_timing",
-                    request_id = %job.request.request_id,
-                    queue_us,
-                    call_export_us,
-                    ok = result.is_ok(),
-                    "render_timing",
-                );
+            let event = poll_fn(|cx| {
+                if let Some(event) = poll_completed(&mut active, cx) {
+                    return Poll::Ready(event);
+                }
+                // Drive timers and native operations before admitting more work.
+                let event_loop = runtime.poll_event_loop(cx);
+                if let Poll::Ready(Err(error)) = &event_loop {
+                    return Poll::Ready(Event::Failed(error.clone()));
+                }
+                if let Some(event) = poll_completed(&mut active, cx) {
+                    return Poll::Ready(event);
+                }
+                if matches!(event_loop, Poll::Ready(Ok(()))) && !active.is_empty() {
+                    return Poll::Ready(Event::Quiescent);
+                }
+                if !closed && active.len() < max_in_flight {
+                    match receiver.poll_recv(cx) {
+                        Poll::Ready(Some(job)) => return Poll::Ready(Event::Job(job)),
+                        Poll::Ready(None) => return Poll::Ready(Event::Closed),
+                        Poll::Pending => {}
+                    }
+                }
+                Poll::Pending
+            }).await;
+            match event {
+                Event::Job(job) => {
+                    if job.reply.is_closed() { continue; }
+                    #[cfg(feature = "render-timing")]
+                    let span = tracing::info_span!(
+                        target: "rubicon::runtime_timing", "render",
+                        request_id = %job.request.request_id,
+                    );
+                    #[cfg(feature = "render-timing")]
+                    let started = std::time::Instant::now();
+                    #[cfg(feature = "render-timing")]
+                    let launched = span.in_scope(|| runtime.begin_export(module_id, "render", &job.request));
+                    #[cfg(not(feature = "render-timing"))]
+                    let launched = runtime.begin_export(module_id, "render", &job.request);
+                    match launched {
+                        Ok(pending) => active.push(ActiveCall {
+                            job, pending,
+                            #[cfg(feature = "render-timing")]
+                            started,
+                            #[cfg(feature = "render-timing")]
+                            span,
+                        }),
+                        Err(error) => {
+                            #[cfg(feature = "render-timing")]
+                            record_render_timing(&job, started, false);
+                            let _ = job.reply.send(Err(error));
+                        }
+                    }
+                }
+                Event::Completed(index, result) => {
+                    let call = active.swap_remove(index);
+                    #[cfg(feature = "render-timing")]
+                    let response = call.span.in_scope(|| result.and_then(|value| runtime.convert_result(value)));
+                    #[cfg(not(feature = "render-timing"))]
+                    let response = result.and_then(|value| runtime.convert_result(value));
+                    #[cfg(feature = "render-timing")]
+                    record_render_timing(&call.job, call.started, response.is_ok());
+                    let _ = call.job.reply.send(response);
+                }
+                Event::Closed => closed = true,
+                Event::Quiescent => {
+                    for call in active.drain(..) {
+                        #[cfg(feature = "render-timing")]
+                        record_render_timing(&call.job, call.started, false);
+                        let _ = call.job.reply.send(Err(
+                            "Export execution failed: Promise resolution is still pending but the event loop has already resolved".to_owned(),
+                        ));
+                    }
+                }
+                Event::Failed(error) => { eprintln!("{error}"); return; }
             }
-
-            let _ = job.reply.send(result);
         }
     });
 }
@@ -186,17 +266,67 @@ fn run_worker<F>(
 mod tests {
     use std::time::Duration;
 
-    use super::{QUEUE_CAPACITY, RenderError, RenderJob, Renderer};
-    use crate::RenderRequest;
+    use super::{RenderError, RenderJob, Renderer};
+    use crate::{RenderRequest, RendererConfig};
     use tokio::sync::{mpsc, oneshot};
 
     #[tokio::test]
+    async fn closed_queue_drains_active_calls_and_skips_cancelled_waiters() {
+        deno_core::JsRuntime::init_platform(None);
+        let entry = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/renderer_concurrent.mjs");
+        let renderer = Renderer::start(entry).await.unwrap();
+        let mut replies = Vec::new();
+        for (id, path, cancelled) in [
+            ("cancelled-before-start", "/gated?key=never-start", true),
+            ("drain-A", "/delay", false),
+            ("drain-B", "/delay", false),
+            ("drain-state", "/state", false),
+        ] {
+            let (reply, received) = oneshot::channel();
+            if cancelled {
+                drop(received);
+            } else {
+                replies.push((id, received));
+            }
+            renderer
+                .sender
+                .try_send(RenderJob {
+                    request: RenderRequest {
+                        request_id: id.to_owned(),
+                        url: format!("http://127.0.0.1:3000{path}"),
+                        method: "GET".to_owned(),
+                        headers: Vec::new(),
+                    },
+                    reply,
+                    #[cfg(feature = "render-timing")]
+                    queued_at: std::time::Instant::now(),
+                })
+                .unwrap();
+        }
+        drop(renderer);
+        for (id, reply) in replies {
+            let response = tokio::time::timeout(Duration::from_secs(5), reply)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            if id == "drain-state" {
+                assert_eq!(response.body, "2|2");
+            } else {
+                assert!(response.body.starts_with(id));
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn full_queue_rejects_render_without_waiting_for_capacity() {
-        let (sender, receiver) = mpsc::channel(QUEUE_CAPACITY);
+        let queue_capacity = 3;
+        let (sender, receiver) = mpsc::channel(queue_capacity);
         let renderer = Renderer { sender };
         let mut pending_replies = Vec::new();
 
-        for _ in 0..QUEUE_CAPACITY {
+        for _ in 0..queue_capacity {
             let request = RenderRequest {
                 request_id: "queue-test".to_owned(),
                 url: "http://127.0.0.1:3000/test".to_owned(),
@@ -233,6 +363,20 @@ mod tests {
         .expect("A full queue must reject the request without waiting for capacity");
 
         assert!(matches!(result, Err(RenderError::Busy)));
-        assert_eq!(receiver.len(), QUEUE_CAPACITY);
+        assert_eq!(receiver.len(), queue_capacity);
+    }
+
+    #[tokio::test]
+    async fn invalid_config_is_rejected_before_creating_a_runtime() {
+        let result = Renderer::start_with_config(
+            std::path::PathBuf::from("not-a-module.mjs"),
+            RendererConfig {
+                max_in_flight: 0,
+                queue_capacity: 16,
+            },
+            || panic!("An invalid configuration must not create a runtime"),
+        )
+        .await;
+        assert!(matches!(result, Err(message) if message.contains("max_in_flight")));
     }
 }

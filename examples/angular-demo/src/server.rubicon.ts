@@ -1,8 +1,5 @@
 import { AngularAppEngine, createRequestHandler } from '@angular/ssr';
-import type {
-  ProductsDataSource,
-  ProductsRequestContext,
-} from './app/catalog/products.contract';
+import type { ProductsDataSource, ProductsRequestContext } from './app/catalog/products.contract';
 
 const angularApp = new AngularAppEngine();
 
@@ -40,7 +37,7 @@ type RubiconResponse = {
 };
 
 type AdapterTiming = {
-  record(stage: 1 | 2, elapsedMs: number, ok: boolean): boolean;
+  record(requestId: string, stage: 1 | 2, elapsedMs: number, ok: boolean): boolean;
 };
 
 const adapterTiming = (
@@ -49,9 +46,7 @@ const adapterTiming = (
   }
 ).__rubiconAdapterTiming;
 
-export async function render(
-  request: RubiconRequest,
-): Promise<RubiconResponse> {
+export async function render(request: RubiconRequest): Promise<RubiconResponse> {
   const webRequest = new Request(request.url, {
     method: request.method,
     headers: new Headers(request.headers),
@@ -66,7 +61,7 @@ export async function render(
     angularOk = true;
   } finally {
     if (adapterTiming) {
-      adapterTiming.record(1, performance.now() - angularStarted, angularOk);
+      adapterTiming.record(request.request_id, 1, performance.now() - angularStarted, angularOk);
     }
   }
 
@@ -78,9 +73,9 @@ export async function render(
     };
   }
 
-  const headers: [string, string][] = Array.from(
-    response.headers.entries(),
-  ).filter(([name]) => name !== 'set-cookie');
+  const headers: [string, string][] = Array.from(response.headers.entries()).filter(
+    ([name]) => name !== 'set-cookie',
+  );
 
   for (const cookie of response.headers.getSetCookie()) {
     headers.push(['set-cookie', cookie]);
@@ -95,7 +90,7 @@ export async function render(
     bodyOk = true;
   } finally {
     if (adapterTiming) {
-      adapterTiming.record(2, performance.now() - bodyStarted, bodyOk);
+      adapterTiming.record(request.request_id, 2, performance.now() - bodyStarted, bodyOk);
     }
   }
 

@@ -46,7 +46,8 @@ where
 {
     deno_core::JsRuntime::init_platform(None);
 
-    let renderer = Renderer::start_with_runtime(config.server_entry, create_runtime).await?;
+    let renderer =
+        Renderer::start_with_config(config.server_entry, config.renderer, create_runtime).await?;
 
     let state = Arc::new(ServerState {
         renderer,

@@ -91,6 +91,7 @@ async fn serves_application_routes_assets_ssr_and_shuts_down() {
         origin: origin.clone(),
         server_entry: renderer_entry(),
         browser_dir: assets.0.clone(),
+        renderer: Default::default(),
     };
     let routes = Router::new().route("/api/test", get(|| async { "application route" }));
     drop(reserved);
@@ -172,6 +173,7 @@ async fn propagates_shutdown_notification_errors() {
         origin: "http://127.0.0.1:3000".to_owned(),
         server_entry: renderer_entry(),
         browser_dir: Path::new(env!("CARGO_MANIFEST_DIR")).join("js"),
+        renderer: Default::default(),
     };
 
     let result = tokio::time::timeout(

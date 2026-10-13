@@ -1,4 +1,11 @@
-use std::{future::poll_fn, path::Path, rc::Rc, sync::Arc, task::Poll};
+use std::{
+    future::Future,
+    path::Path,
+    pin::Pin,
+    rc::Rc,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use deno_core::{
     FsModuleLoader, JsRuntime, ModuleId, ModuleSpecifier, RuntimeOptions, serde_v8, v8,
@@ -23,7 +30,7 @@ mod server;
 #[cfg(windows)]
 mod windows_timer;
 
-pub use config::ServerConfig;
+pub use config::{RendererConfig, ServerConfig};
 pub use http_response::into_http_response;
 pub use renderer::{RenderError, Renderer};
 pub use request::RenderRequest;
@@ -32,6 +39,9 @@ pub use server::serve;
 
 #[cfg(windows)]
 pub use windows_timer::TimerResolutionGuard;
+
+pub(crate) type PendingExport =
+    Pin<Box<dyn Future<Output = Result<v8::Global<v8::Value>, String>>>>;
 
 pub struct JavaScriptRuntime {
     inner: JsRuntime,
@@ -88,17 +98,10 @@ impl JavaScriptRuntime {
 }
 
 impl JavaScriptRuntime {
-    pub(crate) async fn drive_background_tasks(&mut self) -> Result<(), String> {
-        poll_fn(
-            |cx| match self.inner.poll_event_loop(cx, Default::default()) {
-                Poll::Ready(Err(error)) => {
-                    Poll::Ready(Err(format!("Background event loop failed: {error}")))
-                }
-
-                Poll::Ready(Ok(())) | Poll::Pending => Poll::Pending,
-            },
-        )
-        .await
+    pub(crate) fn poll_event_loop(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), String>> {
+        self.inner
+            .poll_event_loop(cx, Default::default())
+            .map_err(|error| format!("Background event loop failed: {error}"))
     }
     pub async fn load_main_module(&mut self, path: &Path) -> Result<ModuleId, String> {
         let absolute_path = path
@@ -138,6 +141,43 @@ impl JavaScriptRuntime {
         TArgument: serde::Serialize,
         TResult: serde::de::DeserializeOwned,
     {
+        let (function, argument) = self.prepare_export(module_id, export_name, argument)?;
+
+        #[cfg(feature = "render-timing")]
+        let execute_started = std::time::Instant::now();
+
+        let arguments = [argument];
+        let call = Box::pin(self.inner.call_with_args(&function, &arguments));
+
+        let executed = self
+            .inner
+            .with_event_loop_promise(call, Default::default())
+            .await
+            .map_err(|error| format!("Export execution failed: {error}"));
+
+        #[cfg(feature = "render-timing")]
+        {
+            let elapsed_us = execute_started.elapsed().as_micros();
+
+            tracing::info!(
+                target: "rubicon::runtime_timing",
+                stage = "execute",
+                elapsed_us,
+                ok = executed.is_ok(),
+                "runtime_stage_timing",
+            );
+        }
+
+        let result = executed?;
+
+        self.convert_result(result)
+    }
+    fn prepare_export<TArgument: serde::Serialize>(
+        &mut self,
+        module_id: ModuleId,
+        export_name: &str,
+        argument: &TArgument,
+    ) -> Result<(v8::Global<v8::Function>, v8::Global<v8::Value>), String> {
         #[cfg(feature = "render-timing")]
         let prepare_started = std::time::Instant::now();
 
@@ -182,35 +222,41 @@ impl JavaScriptRuntime {
             );
         }
 
-        let (function, argument) = prepared?;
+        prepared
+    }
 
+    pub(crate) fn begin_export<TArgument: serde::Serialize>(
+        &mut self,
+        module_id: ModuleId,
+        export_name: &str,
+        argument: &TArgument,
+    ) -> Result<PendingExport, String> {
+        let (function, argument) = self.prepare_export(module_id, export_name, argument)?;
         #[cfg(feature = "render-timing")]
         let execute_started = std::time::Instant::now();
-
-        let arguments = [argument];
-        let call = Box::pin(self.inner.call_with_args(&function, &arguments));
-
-        let executed = self
-            .inner
-            .with_event_loop_promise(call, Default::default())
-            .await
-            .map_err(|error| format!("Export execution failed: {error}"));
-
-        #[cfg(feature = "render-timing")]
-        {
-            let elapsed_us = execute_started.elapsed().as_micros();
-
+        // call_with_args starts the export now; its owned future is completed by
+        // later event-loop polls without retaining a mutable runtime borrow.
+        let future = self.inner.call_with_args(&function, &[argument]);
+        Ok(Box::pin(async move {
+            let result = future
+                .await
+                .map_err(|error| format!("Export execution failed: {error}"));
+            #[cfg(feature = "render-timing")]
             tracing::info!(
                 target: "rubicon::runtime_timing",
                 stage = "execute",
-                elapsed_us,
-                ok = executed.is_ok(),
+                elapsed_us = execute_started.elapsed().as_micros(),
+                ok = result.is_ok(),
                 "runtime_stage_timing",
             );
-        }
+            result
+        }))
+    }
 
-        let result = executed?;
-
+    pub(crate) fn convert_result<TResult: serde::de::DeserializeOwned>(
+        &mut self,
+        result: v8::Global<v8::Value>,
+    ) -> Result<TResult, String> {
         #[cfg(feature = "render-timing")]
         let convert_started = std::time::Instant::now();
 

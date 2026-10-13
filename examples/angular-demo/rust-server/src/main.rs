@@ -41,6 +41,7 @@ async fn main() -> Result<(), String> {
         server_entry: Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../dist/rubicon/server/server.mjs"),
         browser_dir: Path::new(env!("CARGO_MANIFEST_DIR")).join("../dist/rubicon/browser"),
+        renderer: Default::default(),
     }
     .with_environment_overrides()?;
 
