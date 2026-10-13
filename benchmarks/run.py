@@ -51,7 +51,7 @@ def run_k6(k6, url, requests, phase, server, launcher, args, run_dir):
 
     max_duration_s = requests * 10 + 15
 
-    monitor = ResourceMonitor(server, launcher, args.sample_ms)
+    monitor = ResourceMonitor(server, launcher, args.sample_ms, args.process_scan_ms)
     result = subprocess.Popen(
         [
             k6,
@@ -91,7 +91,7 @@ def run_k6(k6, url, requests, phase, server, launcher, args, run_dir):
             result.wait(timeout=10)
         if "k6" in monitor.groups:
             monitor.groups["k6"].finalize_root(completed_cpu_seconds(result))
-        monitor.sample()
+        monitor.sample(force_discovery=True)
         monitor.save(
             run_dir / f"{phase.lower()}.resources.json",
             phase,
@@ -117,6 +117,7 @@ def main():
     parser.add_argument("--warmup", type=int, default=20)
     parser.add_argument("--requests", type=int, default=100)
     parser.add_argument("--sample-ms", type=int, default=100)
+    parser.add_argument("--process-scan-ms", type=int, default=1000)
 
     args = parser.parse_args()
 
@@ -128,6 +129,9 @@ def main():
 
     if args.sample_ms < 10:
         parser.error("--sample-ms must be at least 10")
+
+    if args.process_scan_ms < args.sample_ms:
+        parser.error("--process-scan-ms must be at least --sample-ms")
 
     config_path = args.config.resolve()
     config = tomllib.loads(config_path.read_text(encoding="utf-8"))

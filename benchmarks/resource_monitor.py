@@ -75,9 +75,11 @@ class ProcessGroup:
         self.lifetime = lifetime
         self.processes = {}
 
-    def capture(self, initial=False):
-        candidates = [self.root]
-        if self.descendants and self.root.is_running():
+    def capture(self, initial=False, discover=True):
+        # Keep counters fresh while reusing membership between process scans.
+        discover = discover or not self.processes
+        candidates = [self.root] if discover else []
+        if discover and self.descendants and self.root.is_running():
             try:
                 candidates.extend(self.root.children(recursive=True))
             except psutil.NoSuchProcess:
@@ -156,13 +158,15 @@ class ProcessGroup:
 
 
 class ResourceMonitor:
-    def __init__(self, server, launcher, sample_ms):
+    def __init__(self, server, launcher, sample_ms, process_scan_ms=1000):
         self.groups = {
             "server": ProcessGroup(server, descendants=True),
             "cli": ProcessGroup(launcher),
             "coordinator": ProcessGroup(psutil.Process()),
         }
         self.sample_ms = sample_ms
+        self.process_scan_ms = process_scan_ms
+        self.next_process_scan = 0.0
         self.samples = []
         self.started = time.perf_counter()
         self.sample(initial=True)
@@ -172,10 +176,14 @@ class ResourceMonitor:
             psutil.Process(pid), descendants=True, lifetime=True
         )
 
-    def sample(self, initial=False):
+    def sample(self, initial=False, force_discovery=False):
         started = time.perf_counter()
+        discover = initial or force_discovery or started >= self.next_process_scan
+        if discover:
+            self.next_process_scan = started + self.process_scan_ms / 1000
         readings = {
-            name: group.capture(initial) for name, group in self.groups.items()
+            name: group.capture(initial=initial, discover=discover)
+            for name, group in self.groups.items()
         }
         self.samples.append(
             {
@@ -225,6 +233,7 @@ class ResourceMonitor:
                 sample["collection_duration_s"] for sample in self.samples
             ),
             "sample_interval_ms": self.sample_ms,
+            "process_scan_interval_ms": self.process_scan_ms,
             "logical_cpu_count": psutil.cpu_count(),
             "total_ram_bytes": psutil.virtual_memory().total,
             "psutil_version": psutil.__version__,
@@ -251,10 +260,15 @@ class ResourceMonitor:
                     "Server and k6 include observed descendants. CLI and "
                     "coordinator exclude descendants. Console hosts are excluded."
                 ),
+                "discovery": (
+                    "Process membership is refreshed at process_scan_interval_ms "
+                    "and at phase boundaries. Known process counters are read at "
+                    "sample_interval_ms. A newly attached group is scanned immediately."
+                ),
                 "complete": (
                     "False means a tracked process exited before its final CPU "
                     "counters could be read. Processes that start and exit "
-                    "between samples may be missed."
+                    "between process scans may be missed."
                 ),
             },
             "summary": summary,

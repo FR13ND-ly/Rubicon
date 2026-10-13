@@ -4,11 +4,12 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 import psutil
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from resource_monitor import ProcessGroup, completed_cpu_seconds
+from resource_monitor import ProcessGroup, ResourceMonitor, completed_cpu_seconds
 
 
 @contextmanager
@@ -34,6 +35,81 @@ def worker(source):
 
 
 class ResourceCollectionTests(unittest.TestCase):
+    def test_cached_membership_still_reads_fresh_cpu_and_memory(self):
+        source = """
+import sys, time
+print('READY', flush=True)
+sys.stdin.readline()
+memory = bytearray(32 * 1024 * 1024)
+deadline = time.process_time() + 0.3
+while time.process_time() < deadline:
+    sum(range(1000))
+print('UPDATED', flush=True)
+sys.stdin.read()
+"""
+        with worker(source) as process:
+            self.assertEqual(process.stdout.readline().strip(), "READY")
+            group = ProcessGroup(psutil.Process(process.pid), descendants=True)
+            before = group.capture(initial=True)
+            process.stdin.write("update\n")
+            process.stdin.flush()
+            self.assertEqual(process.stdout.readline().strip(), "UPDATED")
+            with patch.object(
+                psutil.Process,
+                "children",
+                side_effect=AssertionError("Unexpected process scan"),
+            ):
+                after = group.capture(discover=False)
+            self.assertGreater(after["cpu_seconds"], 0.25)
+            self.assertGreater(
+                after["rss_bytes"] - before["rss_bytes"], 24 * 1024 * 1024
+            )
+
+    def test_phase_boundary_discovers_child_before_periodic_scan_is_due(self):
+        leaf = """
+import sys, time
+memory = bytearray(32 * 1024 * 1024)
+deadline = time.process_time() + 0.3
+while time.process_time() < deadline:
+    sum(range(1000))
+print('CHILD_READY', flush=True)
+sys.stdin.read()
+"""
+        parent = f"""
+import subprocess, sys
+print('READY', flush=True)
+sys.stdin.readline()
+child = subprocess.Popen(
+    [sys.executable, '-u', '-c', {leaf!r}],
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
+)
+print(child.stdout.readline().strip(), flush=True)
+sys.stdin.read()
+child.stdin.close()
+child.wait(timeout=5)
+"""
+        idle = "import sys; print('READY', flush=True); sys.stdin.read()"
+        with worker(parent) as server, worker(idle) as launcher:
+            self.assertEqual(server.stdout.readline().strip(), "READY")
+            self.assertEqual(launcher.stdout.readline().strip(), "READY")
+            monitor = ResourceMonitor(
+                psutil.Process(server.pid),
+                psutil.Process(launcher.pid),
+                sample_ms=100,
+                process_scan_ms=60000,
+            )
+            server.stdin.write("spawn\n")
+            server.stdin.flush()
+            self.assertEqual(server.stdout.readline().strip(), "CHILD_READY")
+            monitor.sample()
+            self.assertEqual(
+                monitor.samples[-1]["groups"]["server"]["live_processes"], 1
+            )
+            monitor.sample(force_discovery=True)
+            reading = monitor.samples[-1]["groups"]["server"]
+            self.assertEqual(reading["live_processes"], 2)
+            self.assertGreater(reading["cpu_seconds"], 0.25)
+
     def test_phase_excludes_prior_cpu_and_includes_new_child_cpu_and_ram(self):
         leaf = """
 import sys, time
