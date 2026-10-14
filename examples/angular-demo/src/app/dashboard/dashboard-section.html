@@ -1,0 +1,13 @@
+<section>
+  <h3>{{ title() }}</h3>
+
+  <ul class="product-grid">
+    @for (product of products(); track product.id) {
+      <li>
+        <app-product-card [product]="product" />
+      </li>
+    } @empty {
+      <li>Nu sunt produse disponibile.</li>
+    }
+  </ul>
+</section>

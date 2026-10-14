@@ -1,0 +1,22 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+article {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+}
+
+h4 {
+  margin-top: 0;
+  font-size: 1.125rem;
+}
+
+button {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+}

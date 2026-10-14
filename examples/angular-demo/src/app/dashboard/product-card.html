@@ -1,0 +1,11 @@
+<article [attr.data-product-id]="product().id">
+  <h4>{{ product().name }}</h4>
+
+  @if (detailsVisible()) {
+    <app-product-details [product]="product()" />
+  }
+
+  <button type="button" [attr.aria-expanded]="detailsVisible()" (click)="toggleDetails()">
+    {{ detailsVisible() ? 'Ascunde detaliile' : 'Arată detaliile' }}
+  </button>
+</article>
