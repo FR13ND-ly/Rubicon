@@ -10,9 +10,9 @@ use std::{
     time::Duration,
 };
 
-use deno_core::{OpState, op2};
+use deno_core::{OpState, futures::poll, op2};
 use rubicon::{JavaScriptRuntime, RenderError, RenderRequest, Renderer, RendererConfig};
-use tokio::sync::Barrier;
+use tokio::sync::{Barrier, Semaphore};
 
 #[op2]
 async fn op_pool_test_wait(state: Rc<RefCell<OpState>>) {
@@ -89,6 +89,48 @@ deno_core::extension!(
         state.put(StartupWaitState {
             started: options.started,
             completed: options.completed,
+        });
+    },
+);
+
+struct RenderWaitState {
+    started: mpsc::Sender<()>,
+    release: Arc<Semaphore>,
+}
+
+#[op2]
+async fn op_pool_test_render_wait(state: Rc<RefCell<OpState>>) -> bool {
+    let (started, release) = {
+        let state = state.borrow();
+        let wait = state.borrow::<RenderWaitState>();
+
+        (wait.started.clone(), Arc::clone(&wait.release))
+    };
+
+    drop(state);
+
+    started.send(()).expect("Cannot signal active rendering");
+
+    match tokio::time::timeout(Duration::from_secs(10), release.acquire_owned()).await {
+        Ok(Ok(permit)) => {
+            permit.forget();
+            true
+        }
+        _ => false,
+    }
+}
+
+deno_core::extension!(
+    pool_render_wait_test,
+    ops = [op_pool_test_render_wait],
+    options = {
+        started: mpsc::Sender<()>,
+        release: Arc<Semaphore>,
+    },
+    state = |state, options| {
+        state.put(RenderWaitState {
+            started: options.started,
+            release: options.release,
         });
     },
 );
@@ -500,4 +542,120 @@ async fn explicit_shutdown_is_shared_and_rejects_further_renders() {
     })
     .await
     .expect("Explicit shutdown checks timed out");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn shutdown_drains_accepted_requests_after_waiter_cancellation() {
+    let release = Arc::new(Semaphore::new(0));
+    let dropped = Arc::new(AtomicUsize::new(0));
+
+    let factory_release = Arc::clone(&release);
+    let factory_dropped = Arc::clone(&dropped);
+
+    let (started_sender, started_receiver) = mpsc::channel::<()>();
+
+    let entry = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/renderer_pool_shutdown_wait.mjs");
+
+    let renderer = tokio::time::timeout(
+        Duration::from_secs(5),
+        Renderer::start_with_config(
+            entry,
+            RendererConfig {
+                workers: 2,
+                max_in_flight: 1,
+                queue_capacity: 2,
+            },
+            move || {
+                JavaScriptRuntime::with_extensions(vec![
+                    pool_render_wait_test::init(
+                        started_sender.clone(),
+                        Arc::clone(&factory_release),
+                    ),
+                    pool_cleanup_test::init(Arc::clone(&factory_dropped)),
+                ])
+            },
+        ),
+    )
+    .await
+    .expect("Pool initialization timed out")
+    .expect("Pool initialization failed");
+
+    let [active_a, active_b] = ["active-A", "active-B"].map(|id| {
+        let renderer = renderer.clone();
+
+        tokio::spawn(async move { renderer.render(request(id)).await })
+    });
+
+    tokio::task::spawn_blocking(move || {
+        for _ in 0..2 {
+            started_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("Both workers must start rendering");
+        }
+    })
+    .await
+    .expect("Render start monitor failed");
+
+    let mut queued_a = Box::pin(renderer.render(request("queued-A")));
+    let mut queued_b = Box::pin(renderer.render(request("queued-B")));
+
+    assert!(
+        poll!(queued_a.as_mut()).is_pending(),
+        "Queued request A must be accepted and wait",
+    );
+    assert!(
+        poll!(queued_b.as_mut()).is_pending(),
+        "Queued request B must be accepted and wait",
+    );
+
+    let mut abandoned = Box::pin(renderer.shutdown());
+
+    assert!(
+        poll!(abandoned.as_mut()).is_pending(),
+        "Shutdown must wait for accepted work",
+    );
+
+    drop(abandoned);
+
+    let mut shutdown = Box::pin(renderer.shutdown());
+
+    assert!(
+        poll!(shutdown.as_mut()).is_pending(),
+        "A new shutdown waiter must still wait for the workers",
+    );
+
+    assert!(matches!(
+        renderer.render(request("too-late")).await,
+        Err(RenderError::Unavailable),
+    ));
+
+    release.add_permits(2);
+
+    let (first, second, third, fourth, stopped) =
+        tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::join!(active_a, active_b, queued_a, queued_b, shutdown,)
+        })
+        .await
+        .expect("Accepted requests or shutdown did not finish");
+
+    for (id, result) in [
+        ("active-A", first.expect("Active task A failed")),
+        ("active-B", second.expect("Active task B failed")),
+        ("queued-A", third),
+        ("queued-B", fourth),
+    ] {
+        let response = result.expect("An accepted render was lost");
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body, id);
+        assert_eq!(
+            response.headers,
+            vec![("x-request-id".to_owned(), id.to_owned())],
+        );
+    }
+
+    stopped.expect("Shutdown failed");
+
+    assert_eq!(dropped.load(Ordering::SeqCst), 2);
 }
