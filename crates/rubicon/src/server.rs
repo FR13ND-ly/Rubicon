@@ -49,49 +49,75 @@ where
     let renderer =
         Renderer::start_with_config(config.server_entry, config.renderer, create_runtime).await?;
 
-    let state = Arc::new(ServerState {
-        renderer,
-        origin: config.origin,
-    });
+    let cleanup = renderer.clone();
 
-    let ssr = Router::new()
-        .route("/", get(root))
-        .route("/{*path}", get(root))
-        .with_state(Arc::clone(&state));
+    let server_result = async move {
+        let state = Arc::new(ServerState {
+            renderer,
+            origin: config.origin,
+        });
 
-    let app = application_routes.fallback_service(
-        ServeDir::new(config.browser_dir)
-            .append_index_html_on_directories(false)
-            .fallback(ssr),
-    );
+        let ssr = Router::new()
+            .route("/", get(root))
+            .route("/{*path}", get(root))
+            .with_state(Arc::clone(&state));
 
-    let listener = tokio::net::TcpListener::bind(config.bind)
-        .await
-        .map_err(|error| format!("HTTP listener creation failed: {error}"))?;
+        let app = application_routes.fallback_service(
+            ServeDir::new(config.browser_dir)
+                .append_index_html_on_directories(false)
+                .fallback(ssr),
+        );
 
-    println!("Rubicon is running at {}", state.origin);
+        let listener = tokio::net::TcpListener::bind(config.bind)
+            .await
+            .map_err(|error| format!("HTTP listener creation failed: {error}"))?;
 
-    let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
+        println!("Rubicon is running at {}", state.origin);
 
-    let server = axum::serve(listener, app).with_graceful_shutdown(async move {
-        let _ = shutdown_receiver.await;
-    });
+        let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
 
-    let server = std::future::IntoFuture::into_future(server);
-    tokio::pin!(server);
+        let server = axum::serve(listener, app).with_graceful_shutdown(async move {
+            let _ = shutdown_receiver.await;
+        });
 
-    let server_result = tokio::select! {
-        result = &mut server => result,
+        let server = std::future::IntoFuture::into_future(server);
 
-        signal = shutdown => {
-            signal?;
+        tokio::pin!(server);
 
-            let _ = shutdown_sender.send(());
-            server.await
+        tokio::select! {
+            result = &mut server => {
+                result.map_err(|error| {
+                    format!("HTTP server failed: {error}")
+                })
+            }
+
+            signal = shutdown => {
+                let _ = shutdown_sender.send(());
+
+                let http_result = server.await.map_err(|error| {
+                    format!("HTTP server failed: {error}")
+                });
+
+                combine_results(signal, http_result)
+            }
         }
-    };
+    }
+    .await;
 
-    server_result.map_err(|error| format!("HTTP server failed: {error}"))
+    let cleanup_result = cleanup
+        .shutdown()
+        .await
+        .map_err(|error| format!("Renderer shutdown failed: {error}"));
+
+    combine_results(server_result, cleanup_result)
+}
+
+fn combine_results(primary: Result<(), String>, cleanup: Result<(), String>) -> Result<(), String> {
+    match (primary, cleanup) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Err(primary), Err(cleanup)) => Err(format!("{primary}; {cleanup}")),
+    }
 }
 
 async fn root(

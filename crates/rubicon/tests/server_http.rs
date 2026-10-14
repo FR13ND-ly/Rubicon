@@ -1,4 +1,5 @@
 use std::{
+    future::Future,
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     path::{Path, PathBuf},
@@ -10,7 +11,68 @@ use std::{
 };
 
 use axum::{Router, routing::get};
-use rubicon::{JavaScriptRuntime, ServerConfig, serve};
+use rubicon::{JavaScriptRuntime, RendererConfig, ServerConfig, serve};
+
+struct HttpRuntimeDropProbe(Arc<AtomicUsize>);
+
+impl Drop for HttpRuntimeDropProbe {
+    fn drop(&mut self) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+deno_core::extension!(
+    http_cleanup_test,
+    options = {
+        dropped: Arc<AtomicUsize>,
+    },
+    state = |state, options| {
+        state.put(HttpRuntimeDropProbe(options.dropped));
+    },
+);
+
+async fn serve_with_cleanup_probe<S>(bind: SocketAddr, shutdown: S) -> Result<(), String>
+where
+    S: Future<Output = Result<(), String>> + Send + 'static,
+{
+    let dropped = Arc::new(AtomicUsize::new(0));
+    let factory_dropped = Arc::clone(&dropped);
+
+    let config = ServerConfig {
+        bind,
+        origin: format!("http://{bind}"),
+        server_entry: renderer_entry(),
+        browser_dir: Path::new(env!("CARGO_MANIFEST_DIR")).join("js"),
+        renderer: RendererConfig {
+            workers: 2,
+            ..Default::default()
+        },
+    };
+
+    let result = tokio::time::timeout(
+        Duration::from_secs(10),
+        serve(
+            config,
+            Router::new(),
+            move || {
+                JavaScriptRuntime::with_extensions(vec![http_cleanup_test::init(Arc::clone(
+                    &factory_dropped,
+                ))])
+            },
+            shutdown,
+        ),
+    )
+    .await
+    .expect("Server lifecycle check timed out");
+
+    assert_eq!(
+        dropped.load(Ordering::SeqCst),
+        2,
+        "Both runtime states must be released before serve returns: {result:?}",
+    );
+
+    result
+}
 
 struct BrowserAssets(PathBuf);
 
@@ -186,4 +248,40 @@ async fn propagates_shutdown_notification_errors() {
     .expect("Server did not propagate the shutdown error");
 
     assert_eq!(result, Err("test shutdown failure".to_owned()));
+}
+
+#[tokio::test]
+async fn serve_releases_workers_after_normal_shutdown() {
+    serve_with_cleanup_probe("127.0.0.1:0".parse().unwrap(), async { Ok(()) })
+        .await
+        .expect("Normal server shutdown failed");
+}
+
+#[tokio::test]
+async fn serve_releases_workers_after_shutdown_signal_error() {
+    let result = serve_with_cleanup_probe("127.0.0.1:0".parse().unwrap(), async {
+        Err("intentional shutdown signal failure".to_owned())
+    })
+    .await;
+
+    assert_eq!(
+        result,
+        Err("intentional shutdown signal failure".to_owned()),
+    );
+}
+
+#[tokio::test]
+async fn serve_releases_workers_when_listening_port_is_occupied() {
+    let occupied = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = occupied.local_addr().unwrap();
+
+    let result =
+        serve_with_cleanup_probe(address, std::future::pending::<Result<(), String>>()).await;
+
+    let error = result.expect_err("An occupied port must be rejected");
+
+    assert!(
+        error.starts_with("HTTP listener creation failed:"),
+        "Unexpected server error: {error}",
+    );
 }
