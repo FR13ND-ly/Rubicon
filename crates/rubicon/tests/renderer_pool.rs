@@ -1,16 +1,22 @@
 use std::{
     cell::RefCell,
+    collections::HashSet,
     path::Path,
     rc::Rc,
     sync::{
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
         atomic::{AtomicUsize, Ordering},
         mpsc,
     },
+    thread::{self, ThreadId},
     time::Duration,
 };
 
-use deno_core::{OpState, futures::poll, op2};
+use deno_core::{
+    OpState,
+    futures::{future::join_all, poll},
+    op2,
+};
 use rubicon::{JavaScriptRuntime, RenderError, RenderRequest, Renderer, RendererConfig};
 use tokio::sync::{Barrier, Semaphore};
 
@@ -135,6 +141,66 @@ deno_core::extension!(
     },
 );
 
+#[derive(Default)]
+struct SyncWaitState {
+    threads: Vec<ThreadId>,
+    timed_out: bool,
+}
+
+struct SyncWaitGate {
+    participants: usize,
+    state: Mutex<SyncWaitState>,
+    changed: Condvar,
+}
+
+impl SyncWaitGate {
+    fn new(participants: usize) -> Self {
+        Self {
+            participants,
+            state: Mutex::new(SyncWaitState::default()),
+            changed: Condvar::new(),
+        }
+    }
+
+    fn wait(&self) -> bool {
+        let mut state = self.state.lock().unwrap();
+        state.threads.push(thread::current().id());
+        self.changed.notify_all();
+
+        let (mut state, timeout) = self
+            .changed
+            .wait_timeout_while(state, Duration::from_secs(5), |state| {
+                state.threads.len() < self.participants && !state.timed_out
+            })
+            .unwrap();
+
+        if timeout.timed_out() && state.threads.len() < self.participants {
+            // Later serial calls must not turn a timed-out rendezvous into success.
+            state.timed_out = true;
+            self.changed.notify_all();
+        }
+
+        !state.timed_out && state.threads.len() == self.participants
+    }
+}
+
+#[op2(fast)]
+fn op_pool_test_sync_wait(state: &mut OpState) -> bool {
+    // Deliberately block this worker's synchronous JavaScript call stack.
+    state.borrow::<Arc<SyncWaitGate>>().wait()
+}
+
+deno_core::extension!(
+    pool_sync_test,
+    ops = [op_pool_test_sync_wait],
+    options = {
+        gate: Arc<SyncWaitGate>,
+    },
+    state = |state, options| {
+        state.put(options.gate);
+    },
+);
+
 fn request(id: &str) -> RenderRequest {
     RenderRequest {
         request_id: id.to_owned(),
@@ -142,6 +208,90 @@ fn request(id: &str) -> RenderRequest {
         method: "GET".to_owned(),
         headers: vec![("x-marker".to_owned(), id.to_owned())],
     }
+}
+
+async fn check_synchronous_worker_execution(workers: usize, overlapped: bool) {
+    let participants = workers.max(2);
+    let gate = Arc::new(SyncWaitGate::new(participants));
+    let factory_gate = Arc::clone(&gate);
+
+    let entry = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/renderer_pool_sync.mjs");
+
+    let renderer = tokio::time::timeout(
+        Duration::from_secs(10),
+        Renderer::start_with_config(
+            entry,
+            RendererConfig {
+                workers,
+                max_in_flight: 16,
+                queue_capacity: 16,
+            },
+            move || {
+                JavaScriptRuntime::with_extensions(vec![pool_sync_test::init(Arc::clone(
+                    &factory_gate,
+                ))])
+            },
+        ),
+    )
+    .await
+    .expect("Synchronous pool initialization timed out")
+    .expect("Synchronous pool initialization failed");
+
+    let identifiers: Vec<_> = (0..participants)
+        .map(|index| format!("sync-{workers}-{index}"))
+        .collect();
+
+    let responses = tokio::time::timeout(
+        Duration::from_secs(15),
+        join_all(identifiers.iter().map(|id| renderer.render(request(id)))),
+    )
+    .await;
+
+    tokio::time::timeout(Duration::from_secs(10), renderer.shutdown())
+        .await
+        .expect("Synchronous pool shutdown timed out")
+        .expect("Synchronous pool shutdown failed");
+
+    for (id, result) in identifiers
+        .into_iter()
+        .zip(responses.expect("Synchronous rendering timed out"))
+    {
+        let response = result.expect("Synchronous rendering failed");
+        assert_eq!(response.status, 200);
+        assert_eq!(
+            response.headers,
+            vec![("x-request-id".to_owned(), id.clone())],
+        );
+        assert_eq!(response.body, format!("{id}|{overlapped}|704982704"));
+    }
+
+    let state = gate.state.lock().unwrap();
+    assert_eq!(state.threads.len(), participants);
+    assert_eq!(state.timed_out, !overlapped);
+    assert_eq!(
+        state.threads.iter().copied().collect::<HashSet<_>>().len(),
+        workers,
+        "Synchronous rendering must use the expected number of distinct worker threads",
+    );
+    assert!(
+        !state.threads.contains(&thread::current().id()),
+        "Rendering must execute outside the caller's Tokio thread",
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn synchronous_renders_are_serial_with_one_worker() {
+    check_synchronous_worker_execution(1, false).await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn synchronous_renders_overlap_on_two_worker_threads() {
+    check_synchronous_worker_execution(2, true).await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn synchronous_renders_overlap_on_four_worker_threads() {
+    check_synchronous_worker_execution(4, true).await;
 }
 
 #[tokio::test(flavor = "current_thread")]
