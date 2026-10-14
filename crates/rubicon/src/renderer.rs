@@ -1,6 +1,10 @@
 use async_channel::{Receiver, Sender, TrySendError};
 use deno_core::{
-    futures::{Stream, StreamExt, stream::FuturesUnordered},
+    futures::{
+        FutureExt, Stream, StreamExt,
+        future::{BoxFuture, Shared},
+        stream::FuturesUnordered,
+    },
     v8,
 };
 use std::{future::poll_fn, path::PathBuf, sync::Arc, task::Poll, thread};
@@ -45,7 +49,7 @@ async fn join_workers(workers: Vec<thread::JoinHandle<()>>) -> Result<(), String
         }
 
         if panicked {
-            Err("A renderer worker panicked during startup cleanup.".to_owned())
+            Err("A renderer worker panicked while shutting down.".to_owned())
         } else {
             Ok(())
         }
@@ -57,6 +61,7 @@ async fn join_workers(workers: Vec<thread::JoinHandle<()>>) -> Result<(), String
 #[derive(Clone)]
 pub struct Renderer {
     sender: Sender<RenderJob>,
+    completion: Shared<BoxFuture<'static, Result<(), String>>>,
 }
 
 #[derive(Debug)]
@@ -79,6 +84,13 @@ fn record_render_timing(job: &RenderJob, started: std::time::Instant, ok: bool) 
 }
 
 impl Renderer {
+    fn from_workers(sender: Sender<RenderJob>, workers: Vec<thread::JoinHandle<()>>) -> Self {
+        Self {
+            sender,
+            completion: join_workers(workers).boxed().shared(),
+        }
+    }
+
     pub async fn start(module_path: PathBuf) -> Result<Self, String> {
         Self::start_with_runtime(module_path, JavaScriptRuntime::new).await
     }
@@ -191,7 +203,7 @@ impl Renderer {
             return Err(error);
         }
 
-        Ok(Self { sender })
+        Ok(Self::from_workers(sender, workers))
     }
 
     pub async fn render(&self, request: RenderRequest) -> Result<RenderResponse, RenderError> {
@@ -214,6 +226,11 @@ impl Renderer {
             .await
             .map_err(|_| RenderError::Unavailable)?
             .map_err(RenderError::Failed)
+    }
+
+    pub async fn shutdown(&self) -> Result<(), String> {
+        self.sender.close();
+        self.completion.clone().await
     }
 }
 
@@ -442,7 +459,7 @@ mod tests {
     async fn full_queue_rejects_render_without_waiting_for_capacity() {
         let queue_capacity = 3;
         let (sender, receiver) = async_channel::bounded(queue_capacity);
-        let renderer = Renderer { sender };
+        let renderer = Renderer::from_workers(sender, Vec::new());
         let mut pending_replies = Vec::new();
 
         for _ in 0..queue_capacity {

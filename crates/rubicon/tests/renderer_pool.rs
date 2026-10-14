@@ -439,3 +439,65 @@ async fn last_renderer_handle_drop_releases_all_runtime_states() {
 
     assert_eq!(dropped.load(Ordering::SeqCst), 2);
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn explicit_shutdown_is_shared_and_rejects_further_renders() {
+    let dropped = Arc::new(AtomicUsize::new(0));
+    let factory_dropped = Arc::clone(&dropped);
+
+    let entry = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/renderer_async.mjs");
+
+    let renderer = tokio::time::timeout(
+        Duration::from_secs(5),
+        Renderer::start_with_config(
+            entry,
+            RendererConfig {
+                workers: 2,
+                max_in_flight: 1,
+                queue_capacity: 16,
+            },
+            move || {
+                JavaScriptRuntime::with_extensions(vec![pool_cleanup_test::init(Arc::clone(
+                    &factory_dropped,
+                ))])
+            },
+        ),
+    )
+    .await
+    .expect("Pool initialization timed out")
+    .expect("Pool initialization failed");
+
+    let other = renderer.clone();
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        let (first, second) = tokio::join!(renderer.shutdown(), other.shutdown(),);
+
+        first.expect("First shutdown failed");
+        second.expect("Concurrent shutdown failed");
+
+        assert_eq!(
+            dropped.load(Ordering::SeqCst),
+            2,
+            "Both runtime states must be released before shutdown returns",
+        );
+
+        assert!(matches!(
+            renderer.render(request("after-shutdown")).await,
+            Err(RenderError::Unavailable),
+        ));
+
+        assert!(matches!(
+            other.render(request("after-shutdown-clone")).await,
+            Err(RenderError::Unavailable),
+        ));
+
+        renderer.shutdown().await.expect("Repeated shutdown failed");
+
+        other
+            .shutdown()
+            .await
+            .expect("Repeated shutdown through the clone failed");
+    })
+    .await
+    .expect("Explicit shutdown checks timed out");
+}
