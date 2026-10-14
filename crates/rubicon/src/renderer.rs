@@ -1,10 +1,12 @@
-use crate::PendingExport;
-use deno_core::v8;
-use std::{future::poll_fn, path::PathBuf, task::Poll, thread};
+use async_channel::{Receiver, Sender, TrySendError};
+use deno_core::{
+    futures::{Stream, StreamExt, stream::FuturesUnordered},
+    v8,
+};
+use std::{future::poll_fn, path::PathBuf, sync::Arc, task::Poll, thread};
+use tokio::sync::oneshot;
 
-use tokio::sync::{mpsc, oneshot};
-
-use crate::{JavaScriptRuntime, RenderRequest, RenderResponse, RendererConfig};
+use crate::{JavaScriptRuntime, PendingExport, RenderRequest, RenderResponse, RendererConfig};
 
 struct RenderJob {
     request: RenderRequest,
@@ -14,9 +16,47 @@ struct RenderJob {
     queued_at: std::time::Instant,
 }
 
+struct PoolLifetime {
+    receiver: Receiver<RenderJob>,
+}
+
+impl Drop for PoolLifetime {
+    fn drop(&mut self) {
+        self.receiver.close();
+
+        while let Ok(job) = self.receiver.try_recv() {
+            drop(job);
+        }
+    }
+}
+
+async fn join_workers(workers: Vec<thread::JoinHandle<()>>) -> Result<(), String> {
+    if workers.is_empty() {
+        return Ok(());
+    }
+
+    tokio::task::spawn_blocking(move || {
+        let mut panicked = false;
+
+        for worker in workers {
+            if worker.join().is_err() {
+                panicked = true;
+            }
+        }
+
+        if panicked {
+            Err("A renderer worker panicked during startup cleanup.".to_owned())
+        } else {
+            Ok(())
+        }
+    })
+    .await
+    .map_err(|error| format!("Worker cleanup task failed: {error}"))?
+}
+
 #[derive(Clone)]
 pub struct Renderer {
-    sender: mpsc::Sender<RenderJob>,
+    sender: Sender<RenderJob>,
 }
 
 #[derive(Debug)]
@@ -48,7 +88,7 @@ impl Renderer {
         create_runtime: F,
     ) -> Result<Self, String>
     where
-        F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
+        F: Fn() -> Result<JavaScriptRuntime, String> + Send + Sync + 'static,
     {
         Self::start_with_config(module_path, RendererConfig::default(), create_runtime).await
     }
@@ -59,30 +99,97 @@ impl Renderer {
         create_runtime: F,
     ) -> Result<Self, String>
     where
-        F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
+        F: Fn() -> Result<JavaScriptRuntime, String> + Send + Sync + 'static,
     {
         config.validate()?;
-        let (sender, receiver) = mpsc::channel(config.queue_capacity);
-        let (ready_sender, ready_receiver) = oneshot::channel();
+        deno_core::JsRuntime::init_platform(None);
 
-        let _worker = thread::Builder::new()
-            .name("rubicon-renderer".to_owned())
-            .spawn(move || {
-                run_worker(
-                    module_path,
-                    receiver,
-                    ready_sender,
-                    create_runtime,
-                    config.max_in_flight,
-                )
-            })
-            .map_err(|error| format!("Worker thread creation failed: {error}"))?;
+        let (sender, receiver) = async_channel::bounded(config.queue_capacity);
 
-        let startup_result = ready_receiver
-            .await
-            .map_err(|_| "Worker stopped during initialization".to_owned())?;
+        let create_runtime = Arc::new(create_runtime);
+        let pool_lifetime = Arc::new(PoolLifetime {
+            receiver: receiver.clone(),
+        });
 
-        startup_result?;
+        let mut workers = Vec::new();
+        let mut ready = FuturesUnordered::new();
+        let max_in_flight = config.max_in_flight;
+
+        for worker_id in 1..=config.workers {
+            let worker_module = module_path.clone();
+            let worker_receiver = receiver.clone();
+            let worker_factory = Arc::clone(&create_runtime);
+            let worker_lifetime = Arc::clone(&pool_lifetime);
+            let (ready_sender, ready_receiver) = oneshot::channel();
+
+            let worker = thread::Builder::new()
+                .name(format!("rubicon-renderer-{worker_id}"))
+                .spawn(move || {
+                    run_worker(
+                        worker_id,
+                        worker_module,
+                        worker_receiver,
+                        ready_sender,
+                        worker_factory,
+                        max_in_flight,
+                        worker_lifetime,
+                    )
+                });
+
+            match worker {
+                Ok(worker) => workers.push(worker),
+                Err(error) => {
+                    let error = format!("Worker {worker_id} thread creation failed: {error}");
+
+                    sender.close();
+                    ready.clear();
+                    drop(receiver);
+                    drop(pool_lifetime);
+
+                    join_workers(workers)
+                        .await
+                        .map_err(|cleanup| format!("{error}; {cleanup}"))?;
+
+                    return Err(error);
+                }
+            }
+
+            ready.push(async move { (worker_id, ready_receiver.await) });
+        }
+
+        drop(receiver);
+
+        while let Some((worker_id, result)) = ready.next().await {
+            let error = match result {
+                Ok(Ok(())) => continue,
+                Ok(Err(error)) => error,
+                Err(_) => "Worker stopped during initialization".to_owned(),
+            };
+
+            let error = format!("Worker {worker_id} initialization failed: {error}");
+
+            sender.close();
+            ready.clear();
+            drop(pool_lifetime);
+
+            join_workers(workers)
+                .await
+                .map_err(|cleanup| format!("{error}; {cleanup}"))?;
+
+            return Err(error);
+        }
+
+        drop(pool_lifetime);
+
+        if sender.is_closed() {
+            let error = "All renderer workers stopped during initialization.".to_owned();
+
+            join_workers(workers)
+                .await
+                .map_err(|cleanup| format!("{error}; {cleanup}"))?;
+
+            return Err(error);
+        }
 
         Ok(Self { sender })
     }
@@ -99,8 +206,8 @@ impl Renderer {
                 queued_at: std::time::Instant::now(),
             })
             .map_err(|error| match error {
-                mpsc::error::TrySendError::Full(_) => RenderError::Busy,
-                mpsc::error::TrySendError::Closed(_) => RenderError::Unavailable,
+                TrySendError::Full(_) => RenderError::Busy,
+                TrySendError::Closed(_) => RenderError::Unavailable,
             })?;
 
         response
@@ -111,13 +218,15 @@ impl Renderer {
 }
 
 fn run_worker<F>(
+    worker_id: usize,
     module_path: PathBuf,
-    mut receiver: mpsc::Receiver<RenderJob>,
-    ready: oneshot::Sender<Result<(), String>>,
-    create_runtime: F,
+    receiver: Receiver<RenderJob>,
+    mut ready: oneshot::Sender<Result<(), String>>,
+    create_runtime: Arc<F>,
     max_in_flight: usize,
+    lifetime: Arc<PoolLifetime>,
 ) where
-    F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
+    F: Fn() -> Result<JavaScriptRuntime, String> + Send + Sync + 'static,
 {
     let executor = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -131,13 +240,19 @@ fn run_worker<F>(
     };
 
     executor.block_on(async move {
-        let initialization = async {
-            let mut runtime = create_runtime()?;
-            let module_id = runtime.load_main_module(&module_path).await?;
+        tokio::pin!(receiver);
+        let initialization = tokio::select! {
+            biased;
 
-            Ok::<_, String>((runtime, module_id))
-        }
-        .await;
+            _ = ready.closed() => return,
+
+            result = async {
+                let mut runtime = create_runtime()?;
+                let module_id = runtime.load_main_module(&module_path).await?;
+
+                Ok::<_, String>((runtime, module_id))
+            } => result,
+        };
 
         let (mut runtime, module_id) = match initialization {
             Ok(initialized) => initialized,
@@ -187,7 +302,6 @@ fn run_worker<F>(
                 if let Some(event) = poll_completed(&mut active, cx) {
                     return Poll::Ready(event);
                 }
-                // Drive timers and native operations before admitting more work.
                 let event_loop = runtime.poll_event_loop(cx);
                 if let Poll::Ready(Err(error)) = &event_loop {
                     return Poll::Ready(Event::Failed(error.clone()));
@@ -199,7 +313,7 @@ fn run_worker<F>(
                     return Poll::Ready(Event::Quiescent);
                 }
                 if !closed && active.len() < max_in_flight {
-                    match receiver.poll_recv(cx) {
+                    match receiver.as_mut().poll_next(cx) {
                         Poll::Ready(Some(job)) => return Poll::Ready(Event::Job(job)),
                         Poll::Ready(None) => return Poll::Ready(Event::Closed),
                         Poll::Pending => {}
@@ -256,7 +370,12 @@ fn run_worker<F>(
                         ));
                     }
                 }
-                Event::Failed(error) => { eprintln!("{error}"); return; }
+                Event::Failed(error) => {
+                    drop(lifetime);
+
+                    eprintln!("Renderer worker {worker_id}: {error}");
+                    return;
+                }
             }
         }
     });
@@ -268,7 +387,7 @@ mod tests {
 
     use super::{RenderError, RenderJob, Renderer};
     use crate::{RenderRequest, RendererConfig};
-    use tokio::sync::{mpsc, oneshot};
+    use tokio::sync::oneshot;
 
     #[tokio::test]
     async fn closed_queue_drains_active_calls_and_skips_cancelled_waiters() {
@@ -322,7 +441,7 @@ mod tests {
     #[tokio::test]
     async fn full_queue_rejects_render_without_waiting_for_capacity() {
         let queue_capacity = 3;
-        let (sender, receiver) = mpsc::channel(queue_capacity);
+        let (sender, receiver) = async_channel::bounded(queue_capacity);
         let renderer = Renderer { sender };
         let mut pending_replies = Vec::new();
 
@@ -371,6 +490,7 @@ mod tests {
         let result = Renderer::start_with_config(
             std::path::PathBuf::from("not-a-module.mjs"),
             RendererConfig {
+                workers: 1,
                 max_in_flight: 0,
                 queue_capacity: 16,
             },
@@ -378,5 +498,59 @@ mod tests {
         )
         .await;
         assert!(matches!(result, Err(message) if message.contains("max_in_flight")));
+    }
+
+    #[tokio::test]
+    async fn pool_initializes_two_independent_workers() {
+        let threads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let factory_threads = std::sync::Arc::clone(&threads);
+
+        let entry = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/renderer_concurrent.mjs");
+
+        let renderer = Renderer::start_with_config(
+            entry,
+            RendererConfig {
+                workers: 2,
+                max_in_flight: 16,
+                queue_capacity: 16,
+            },
+            move || {
+                factory_threads
+                    .lock()
+                    .unwrap()
+                    .push(std::thread::current().id());
+
+                crate::JavaScriptRuntime::new()
+            },
+        )
+        .await
+        .expect("Pool initialization failed");
+
+        {
+            let created = threads.lock().unwrap();
+
+            assert_eq!(created.len(), 2);
+            assert_ne!(created[0], created[1]);
+        }
+
+        let response = tokio::time::timeout(
+            Duration::from_secs(5),
+            renderer.render(RenderRequest {
+                request_id: "pool-check".to_owned(),
+                url: "http://127.0.0.1:3000/echo".to_owned(),
+                method: "GET".to_owned(),
+                headers: vec![("x-marker".to_owned(), "pool-check".to_owned())],
+            }),
+        )
+        .await
+        .expect("Pool render timed out")
+        .expect("Pool render failed");
+
+        assert_eq!(response.status, 200);
+        assert_eq!(
+            response.body,
+            "pool-check|http://127.0.0.1:3000/echo|pool-check",
+        );
     }
 }

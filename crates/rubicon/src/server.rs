@@ -41,7 +41,7 @@ pub async fn serve<F, S>(
     shutdown: S,
 ) -> Result<(), String>
 where
-    F: FnOnce() -> Result<JavaScriptRuntime, String> + Send + 'static,
+    F: Fn() -> Result<JavaScriptRuntime, String> + Send + Sync + 'static,
     S: Future<Output = Result<(), String>> + Send + 'static,
 {
     deno_core::JsRuntime::init_platform(None);

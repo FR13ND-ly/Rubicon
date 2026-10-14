@@ -39,6 +39,7 @@ pub fn prepare(
     match backend {
         Backend::Rubicon => {
             command
+                .env("RUBICON_WORKERS", application.renderer.workers.to_string())
                 .env(
                     "RUBICON_MAX_IN_FLIGHT",
                     application.renderer.max_in_flight.to_string(),
@@ -150,6 +151,7 @@ mod tests {
             rubicon: backend(),
             node: backend(),
             renderer: RendererSettings {
+                workers: 2,
                 max_in_flight: 4,
                 queue_capacity: 7,
             },
@@ -172,6 +174,10 @@ mod tests {
             assert_eq!(
                 variables.get("RUBICON_QUEUE_CAPACITY").map(String::as_str),
                 expected.then_some("7")
+            );
+            assert_eq!(
+                variables.get("RUBICON_WORKERS").map(String::as_str),
+                expected.then_some("2")
             );
         }
     }

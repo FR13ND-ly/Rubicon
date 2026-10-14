@@ -20,6 +20,7 @@ pub struct ApplicationConfig {
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RendererSettings {
+    pub workers: usize,
     pub max_in_flight: usize,
     pub queue_capacity: usize,
 }
@@ -27,6 +28,7 @@ pub struct RendererSettings {
 impl Default for RendererSettings {
     fn default() -> Self {
         Self {
+            workers: 1,
             max_in_flight: 16,
             queue_capacity: 16,
         }
@@ -35,6 +37,9 @@ impl Default for RendererSettings {
 
 impl RendererSettings {
     fn validate(&self) -> Result<(), String> {
+        if self.workers == 0 {
+            return Err("renderer.workers must be at least 1.".to_owned());
+        }
         if self.max_in_flight == 0 {
             return Err("renderer.max_in_flight must be at least 1.".to_owned());
         }
@@ -197,14 +202,22 @@ mod tests {
     fn renderer_rejects_zero_overflow_and_unknown_fields() {
         for settings in [
             RendererSettings {
+                workers: 0,
+                max_in_flight: 16,
+                queue_capacity: 16,
+            },
+            RendererSettings {
+                workers: 1,
                 max_in_flight: 0,
                 queue_capacity: 16,
             },
             RendererSettings {
+                workers: 1,
                 max_in_flight: 16,
                 queue_capacity: 0,
             },
             RendererSettings {
+                workers: 1,
                 max_in_flight: 16,
                 queue_capacity: usize::MAX,
             },

@@ -192,6 +192,7 @@ async fn main() -> Result<(), String> {
         let configured = Renderer::start_with_config(
             fixture.clone(),
             RendererConfig {
+                workers: 1,
                 max_in_flight: limit,
                 queue_capacity: 64,
             },
@@ -218,6 +219,7 @@ async fn main() -> Result<(), String> {
     let small_queue = Renderer::start_with_config(
         fixture.clone(),
         RendererConfig {
+            workers: 1,
             max_in_flight: 1,
             queue_capacity: 3,
         },

@@ -18,6 +18,7 @@ tokio = { version = "=1.53.2", features = ["rt", "macros", "rt-multi-thread", "n
 serde = { version = "=1.0.229", features = ["derive"] }
 tower-http = { version = "=0.7.1", features = ["fs"] }
 tracing = { version = "=0.1.44", optional = true }
+async-channel = "=2.5.0"
 
 [[test]]
 name = "renderer_errors"

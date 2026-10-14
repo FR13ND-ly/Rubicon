@@ -6,6 +6,7 @@ use std::{
 
 #[derive(Debug, Clone, Copy)]
 pub struct RendererConfig {
+    pub workers: usize,
     pub max_in_flight: usize,
     pub queue_capacity: usize,
 }
@@ -13,6 +14,7 @@ pub struct RendererConfig {
 impl Default for RendererConfig {
     fn default() -> Self {
         Self {
+            workers: 1,
             max_in_flight: 16,
             queue_capacity: 16,
         }
@@ -21,6 +23,9 @@ impl Default for RendererConfig {
 
 impl RendererConfig {
     pub(crate) fn validate(self) -> Result<(), String> {
+        if self.workers == 0 {
+            return Err("Renderer workers must be at least 1.".to_owned());
+        }
         if self.max_in_flight == 0 {
             return Err("Renderer max_in_flight must be at least 1.".to_owned());
         }
@@ -60,6 +65,9 @@ impl ServerConfig {
             self.browser_dir = value;
         }
 
+        if let Some(value) = read_text("RUBICON_WORKERS")? {
+            self.renderer.workers = parse_capacity("RUBICON_WORKERS", &value)?;
+        }
         if let Some(value) = read_text("RUBICON_MAX_IN_FLIGHT")? {
             self.renderer.max_in_flight = parse_capacity("RUBICON_MAX_IN_FLIGHT", &value)?;
         }
@@ -103,14 +111,22 @@ mod tests {
     fn renderer_rejects_invalid_admission_limits() {
         for config in [
             RendererConfig {
+                workers: 0,
+                max_in_flight: 16,
+                queue_capacity: 16,
+            },
+            RendererConfig {
+                workers: 1,
                 max_in_flight: 0,
                 queue_capacity: 16,
             },
             RendererConfig {
+                workers: 1,
                 max_in_flight: 16,
                 queue_capacity: 0,
             },
             RendererConfig {
+                workers: 1,
                 max_in_flight: 16,
                 queue_capacity: usize::MAX,
             },
@@ -120,6 +136,7 @@ mod tests {
         for max_in_flight in [1, 4, 16] {
             assert!(
                 RendererConfig {
+                    workers: 1,
                     max_in_flight,
                     queue_capacity: 16
                 }

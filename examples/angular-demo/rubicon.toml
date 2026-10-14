@@ -3,6 +3,7 @@ bind = "127.0.0.1:3000"
 origin = "http://127.0.0.1:3000"
 
 [renderer]
+workers = 1
 max_in_flight = 16
 queue_capacity = 16
 
