@@ -368,3 +368,74 @@ async fn startup_failure_cancels_a_pending_module_initialization() {
         "Initialization must be cancelled before the operation completes naturally",
     );
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn last_renderer_handle_drop_releases_all_runtime_states() {
+    let barrier = Arc::new(Barrier::new(2));
+    let dropped = Arc::new(AtomicUsize::new(0));
+
+    let factory_dropped = Arc::clone(&dropped);
+
+    let entry = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/renderer_pool.mjs");
+
+    let renderer = tokio::time::timeout(
+        Duration::from_secs(5),
+        Renderer::start_with_config(
+            entry,
+            RendererConfig {
+                workers: 2,
+                max_in_flight: 1,
+                queue_capacity: 16,
+            },
+            move || {
+                JavaScriptRuntime::with_extensions(vec![
+                    pool_test::init(Arc::clone(&barrier)),
+                    pool_cleanup_test::init(Arc::clone(&factory_dropped)),
+                ])
+            },
+        ),
+    )
+    .await
+    .expect("Pool initialization timed out")
+    .expect("Pool initialization failed");
+
+    let remaining = renderer.clone();
+    drop(renderer);
+
+    assert_eq!(
+        dropped.load(Ordering::SeqCst),
+        0,
+        "A remaining Renderer handle must keep the pool available",
+    );
+
+    let (first, second) = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(
+            remaining.render(request("shutdown-A")),
+            remaining.render(request("shutdown-B")),
+        )
+    })
+    .await
+    .expect("The remaining Renderer handle stopped responding");
+
+    for (id, result) in [("shutdown-A", first), ("shutdown-B", second)] {
+        let response = result.expect("Rendering through the clone failed");
+
+        assert_eq!(response.status, 200);
+        assert_eq!(
+            response.body,
+            format!("1|{id}|http://127.0.0.1:3000/pool?id={id}|{id}"),
+        );
+    }
+
+    drop(remaining);
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while dropped.load(Ordering::SeqCst) < 2 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("Runtime states were not released after the last handle");
+
+    assert_eq!(dropped.load(Ordering::SeqCst), 2);
+}
