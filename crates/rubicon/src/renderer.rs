@@ -72,9 +72,10 @@ pub enum RenderError {
 }
 
 #[cfg(feature = "render-timing")]
-fn record_render_timing(job: &RenderJob, started: std::time::Instant, ok: bool) {
+fn record_render_timing(worker_id: usize, job: &RenderJob, started: std::time::Instant, ok: bool) {
     tracing::info!(
         target: "rubicon::render_timing",
+        worker_id,
         request_id = %job.request.request_id,
         queue_us = started.duration_since(job.queued_at).as_micros(),
         call_export_us = started.elapsed().as_micros(),
@@ -344,6 +345,7 @@ fn run_worker<F>(
                     #[cfg(feature = "render-timing")]
                     let span = tracing::info_span!(
                         target: "rubicon::runtime_timing", "render",
+                        worker_id,
                         request_id = %job.request.request_id,
                     );
                     #[cfg(feature = "render-timing")]
@@ -362,7 +364,7 @@ fn run_worker<F>(
                         }),
                         Err(error) => {
                             #[cfg(feature = "render-timing")]
-                            record_render_timing(&job, started, false);
+                            record_render_timing(worker_id, &job, started, false);
                             let _ = job.reply.send(Err(error));
                         }
                     }
@@ -374,14 +376,14 @@ fn run_worker<F>(
                     #[cfg(not(feature = "render-timing"))]
                     let response = result.and_then(|value| runtime.convert_result(value));
                     #[cfg(feature = "render-timing")]
-                    record_render_timing(&call.job, call.started, response.is_ok());
+                    record_render_timing(worker_id, &call.job, call.started, response.is_ok());
                     let _ = call.job.reply.send(response);
                 }
                 Event::Closed => closed = true,
                 Event::Quiescent => {
                     for call in active.drain(..) {
                         #[cfg(feature = "render-timing")]
-                        record_render_timing(&call.job, call.started, false);
+                        record_render_timing(worker_id, &call.job, call.started, false);
                         let _ = call.job.reply.send(Err(
                             "Export execution failed: Promise resolution is still pending but the event loop has already resolved".to_owned(),
                         ));
