@@ -46,6 +46,16 @@ const adapterTiming = (
   }
 ).__rubiconAdapterTiming;
 
+type DemoWarmup = {
+  recordCompletedRender(): boolean;
+};
+
+let demoWarmup = (
+  globalThis as typeof globalThis & {
+    readonly __rubiconDemoWarmup?: DemoWarmup;
+  }
+).__rubiconDemoWarmup;
+
 export async function render(request: RubiconRequest): Promise<RubiconResponse> {
   const webRequest = new Request(request.url, {
     method: request.method,
@@ -91,6 +101,17 @@ export async function render(request: RubiconRequest): Promise<RubiconResponse> 
   } finally {
     if (adapterTiming) {
       adapterTiming.record(request.request_id, 2, performance.now() - bodyStarted, bodyOk);
+    }
+  }
+
+  if (
+    demoWarmup &&
+    response.status === 200 &&
+    webRequest.method === 'GET' &&
+    new URL(webRequest.url).pathname === '/products'
+  ) {
+    if (demoWarmup.recordCompletedRender()) {
+      demoWarmup = undefined;
     }
   }
 

@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use axum::{Json, Router, routing::get};
 use rubicon::{JavaScriptRuntime, ServerConfig, serve};
@@ -9,6 +12,7 @@ use rubicon::TimerResolutionGuard;
 mod catalog;
 mod catalog_native;
 mod shutdown;
+mod warmup;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -48,11 +52,22 @@ async fn main() -> Result<(), String> {
     let application_routes = Router::new().route("/api/products", get(products));
 
     let shutdown = shutdown::signal()?;
+    let warmup_requests = warmup::requests_from_environment()?;
+    let next_runtime_id = AtomicUsize::new(1);
 
     let server_result = serve(
         config,
         application_routes,
-        || JavaScriptRuntime::with_extensions(vec![catalog_native::extension()]),
+        move || {
+            let mut extensions = vec![catalog_native::extension()];
+
+            if let Some(requests) = warmup_requests {
+                let runtime_id = next_runtime_id.fetch_add(1, Ordering::Relaxed);
+                extensions.push(warmup::extension(runtime_id, requests));
+            }
+
+            JavaScriptRuntime::with_extensions(extensions)
+        },
         shutdown,
     )
     .await;
