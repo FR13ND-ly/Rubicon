@@ -53,6 +53,46 @@ deno_core::extension!(
     },
 );
 
+struct StartupWaitState {
+    started: mpsc::Sender<()>,
+    completed: Arc<AtomicUsize>,
+}
+
+#[op2]
+async fn op_pool_test_startup_wait(state: Rc<RefCell<OpState>>) {
+    let (started, completed) = {
+        let state = state.borrow();
+        let wait = state.borrow::<StartupWaitState>();
+
+        (wait.started.clone(), Arc::clone(&wait.completed))
+    };
+
+    drop(state);
+
+    started
+        .send(())
+        .expect("Cannot signal pending module initialization");
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    completed.fetch_add(1, Ordering::SeqCst);
+}
+
+deno_core::extension!(
+    pool_startup_wait_test,
+    ops = [op_pool_test_startup_wait],
+    options = {
+        started: mpsc::Sender<()>,
+        completed: Arc<AtomicUsize>,
+    },
+    state = |state, options| {
+        state.put(StartupWaitState {
+            started: options.started,
+            completed: options.completed,
+        });
+    },
+);
+
 fn request(id: &str) -> RenderRequest {
     RenderRequest {
         request_id: id.to_owned(),
@@ -251,5 +291,80 @@ async fn startup_failure_drops_the_runtime_already_created() {
         dropped.load(Ordering::SeqCst),
         1,
         "The created runtime must be cleaned up before startup returns",
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn startup_failure_cancels_a_pending_module_initialization() {
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let dropped = Arc::new(AtomicUsize::new(0));
+    let completed = Arc::new(AtomicUsize::new(0));
+
+    let factory_attempts = Arc::clone(&attempts);
+    let factory_dropped = Arc::clone(&dropped);
+    let factory_completed = Arc::clone(&completed);
+
+    let (started_sender, started_receiver) = mpsc::channel::<()>();
+    let started_receiver = Mutex::new(started_receiver);
+
+    let entry =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/renderer_pool_startup_wait.mjs");
+
+    let result = tokio::time::timeout(
+        Duration::from_secs(15),
+        Renderer::start_with_config(
+            entry,
+            RendererConfig {
+                workers: 2,
+                max_in_flight: 1,
+                queue_capacity: 16,
+            },
+            move || {
+                let attempt = factory_attempts.fetch_add(1, Ordering::SeqCst);
+
+                if attempt == 0 {
+                    JavaScriptRuntime::with_extensions(vec![
+                        pool_cleanup_test::init(Arc::clone(&factory_dropped)),
+                        pool_startup_wait_test::init(
+                            started_sender.clone(),
+                            Arc::clone(&factory_completed),
+                        ),
+                    ])
+                } else {
+                    started_receiver
+                        .lock()
+                        .unwrap()
+                        .recv_timeout(Duration::from_secs(5))
+                        .map_err(|error| {
+                            format!("Module initialization did not reach its wait: {error}")
+                        })?;
+
+                    Err("intentional failure while another module is loading".to_owned())
+                }
+            },
+        ),
+    )
+    .await
+    .expect("Pending startup cleanup timed out");
+
+    let error = match result {
+        Err(error) => error,
+        Ok(_) => panic!("Pool startup must fail"),
+    };
+
+    assert!(
+        error.contains("intentional failure while another module is loading"),
+        "Unexpected startup error: {error}",
+    );
+    assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        dropped.load(Ordering::SeqCst),
+        1,
+        "The waiting runtime must be cleaned up before startup returns",
+    );
+    assert_eq!(
+        completed.load(Ordering::SeqCst),
+        0,
+        "Initialization must be cancelled before the operation completes naturally",
     );
 }
