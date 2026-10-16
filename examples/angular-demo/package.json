@@ -20,6 +20,7 @@
     "@angular/platform-server": "22.2.2",
     "@angular/router": "22.2.2",
     "@angular/ssr": "22.2.2",
+    "@rubicon/angular": "file:../../packages/angular",
     "express": "^5.1.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
