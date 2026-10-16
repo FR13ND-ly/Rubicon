@@ -19,17 +19,24 @@ export {
   RUBICON_BACKEND,
   provideRubiconBackend,
 } from './provide-backend.js';
+import { createRenderContext } from './request-context.js';
 
 export function createRubiconServer<TContext = unknown>(
     options: RubiconServerOptions<TContext> = {},
 ): RubiconServer {
     const angularApp = new AngularAppEngine();
     const createContext = options.createRequestContext;
+    const backend = options.backend;
+
+    const handle = (request: Request, context?: unknown) =>
+        angularApp.handle(
+            request,
+            backend ? createRenderContext(context, backend) : context,
+        );
 
     const reqHandler: RubiconServer['reqHandler'] = createContext
-        ? async (request) =>
-            angularApp.handle(request, await createContext(request))
-        : (request) => angularApp.handle(request);
+        ? async (request) => handle(request, await createContext(request))
+        : (request) => handle(request);
 
     createRequestHandler(reqHandler);
 

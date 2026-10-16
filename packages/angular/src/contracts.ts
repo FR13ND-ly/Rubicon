@@ -1,3 +1,5 @@
+import type { RubiconBackend } from './backend.contracts.js';
+
 export interface RubiconRequest {
   request_id: string;
   url: string;
@@ -12,6 +14,8 @@ export interface RubiconResponse {
 }
 
 export interface RubiconServerOptions<TContext = unknown> {
+  backend?: RubiconBackend;
+
   createRequestContext?: (
     request: Request,
   ) => TContext | Promise<TContext>;
