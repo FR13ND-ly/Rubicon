@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     "./server": {
       "types": "./dist/server.d.ts",
@@ -16,6 +18,7 @@
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
+    "@angular/common": "22.2.2",
     "@angular/core": "22.2.2",
     "@angular/platform-server": "22.2.2",
     "@angular/router": "22.2.2",
