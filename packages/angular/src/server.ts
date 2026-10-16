@@ -5,7 +5,10 @@ import type {
     RubiconServer,
     RubiconServerOptions,
 } from './contracts.js';
-
+export type {
+  RubiconBackend,
+  RubiconBackendOptions,
+} from './backend.contracts.js';
 export type {
     RubiconRequest,
     RubiconResponse,
