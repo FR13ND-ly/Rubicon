@@ -15,6 +15,10 @@ export type {
     RubiconServer,
     RubiconServerOptions,
 } from './contracts.js';
+export {
+  RUBICON_BACKEND,
+  provideRubiconBackend,
+} from './provide-backend.js';
 
 export function createRubiconServer<TContext = unknown>(
     options: RubiconServerOptions<TContext> = {},
