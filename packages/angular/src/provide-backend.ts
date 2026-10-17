@@ -26,7 +26,7 @@ import {
 } from './request-context.js';
 
 export const RUBICON_BACKEND =
-    new InjectionToken<RubiconBackend>('RubiconBackend');
+  new InjectionToken<RubiconBackend | null>('RubiconBackend');
 
 export function provideRubiconBackend(
     options: RubiconBackendOptions = {},
@@ -70,8 +70,8 @@ export function provideRubiconBackend(
                     ? new RubiconHttpBackend(transport, incoming.url)
                     : null;
 
-                return {
-                    handle(request: HttpRequest<unknown>): Observable<HttpEvent<unknown>> {
+                return new (class extends FetchBackend {
+                    override handle(request: HttpRequest<unknown>): Observable<HttpEvent<unknown>> {
                         return defer(() => {
                             let url: URL;
 
@@ -109,8 +109,8 @@ export function provideRubiconBackend(
 
                             return native.handle(resolved);
                         });
-                    },
-                };
+                    }
+                })();
             },
         },
     ]);

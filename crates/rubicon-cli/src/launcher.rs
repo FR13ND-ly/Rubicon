@@ -144,6 +144,7 @@ mod tests {
             browser_dir: "browser".into(),
         };
         let application = ApplicationConfig {
+            angular: Default::default(),
             server: ServerSettings {
                 bind: "127.0.0.1:3100".parse().unwrap(),
                 origin: "http://127.0.0.1:3100".to_owned(),

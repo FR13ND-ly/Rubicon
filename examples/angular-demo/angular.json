@@ -56,13 +56,6 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
-            },
-            "rubicon": {
-              "ssr": {
-                "entry": "src/server.rubicon.ts",
-                "platform": "neutral"
-              },
-              "outputPath": "dist/rubicon"
             }
           },
           "defaultConfiguration": "production"

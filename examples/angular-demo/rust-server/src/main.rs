@@ -4,13 +4,12 @@ use std::{
 };
 
 use axum::{Json, Router, routing::get};
-use rubicon::{JavaScriptRuntime, ServerConfig, serve};
+use rubicon::{Backend, JavaScriptRuntime, ServerConfig, backend_extension, serve};
 
 #[cfg(windows)]
 use rubicon::TimerResolutionGuard;
 
 mod catalog;
-mod catalog_native;
 mod shutdown;
 mod warmup;
 
@@ -50,6 +49,7 @@ async fn main() -> Result<(), String> {
     .with_environment_overrides()?;
 
     let application_routes = Router::new().route("/api/products", get(products));
+    let backend = Backend::new(application_routes.clone());
 
     let shutdown = shutdown::signal()?;
     let warmup_requests = warmup::requests_from_environment()?;
@@ -59,7 +59,7 @@ async fn main() -> Result<(), String> {
         config,
         application_routes,
         move || {
-            let mut extensions = vec![catalog_native::extension()];
+            let mut extensions = vec![backend_extension(backend.clone(), 2 * 1024 * 1024)];
 
             if let Some(requests) = warmup_requests {
                 let runtime_id = next_runtime_id.fetch_add(1, Ordering::Relaxed);

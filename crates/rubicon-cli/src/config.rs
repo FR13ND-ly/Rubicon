@@ -15,6 +15,28 @@ pub struct ApplicationConfig {
     pub node: BackendSettings,
     #[serde(default)]
     pub renderer: RendererSettings,
+    #[serde(default)]
+    pub angular: AngularSettings,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct AngularSettings {
+    pub project: Option<String>,
+    pub configuration: String,
+    pub entry: PathBuf,
+    pub node_bootstrap: Option<PathBuf>,
+}
+
+impl Default for AngularSettings {
+    fn default() -> Self {
+        Self {
+            project: None,
+            configuration: "production".to_owned(),
+            entry: "src/server.rubicon.ts".into(),
+            node_bootstrap: None,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,6 +116,14 @@ pub fn load(path: &Path) -> Result<ApplicationConfig, String> {
         backend.browser_dir = resolve_path(base_dir, &backend.browser_dir)?;
         backend.executable = resolve_executable(base_dir, &backend.executable)?;
     }
+
+    application.angular.entry = resolve_path(base_dir, &application.angular.entry)?;
+    application.angular.node_bootstrap = application
+        .angular
+        .node_bootstrap
+        .as_deref()
+        .map(|path| resolve_path(base_dir, path))
+        .transpose()?;
 
     Ok(application)
 }
@@ -189,6 +219,12 @@ mod tests {
         let defaults: ApplicationConfig = toml::from_str(BASE).unwrap();
         assert_eq!(defaults.renderer.max_in_flight, 16);
         assert_eq!(defaults.renderer.queue_capacity, 16);
+        assert_eq!(
+            defaults.angular.entry.to_str(),
+            Some("src/server.rubicon.ts")
+        );
+        assert_eq!(defaults.angular.configuration, "production");
+        assert!(defaults.angular.node_bootstrap.is_none());
         let configured: ApplicationConfig = toml::from_str(&format!(
             "{BASE}\n[renderer]\nmax_in_flight = 1\nqueue_capacity = 3\n",
         ))
@@ -226,5 +262,24 @@ mod tests {
         }
         assert!(toml::from_str::<RendererSettings>("max_inflight = 4").is_err());
         assert!(toml::from_str::<RendererSettings>("max_in_flight = -1").is_err());
+    }
+
+    #[test]
+    fn angular_configuration_accepts_optional_baseline_and_rejects_typos() {
+        let configured: ApplicationConfig = toml::from_str(&format!(
+            "{BASE}\n[angular]\nproject = 'store'\nconfiguration = 'development'\nnode_bootstrap = 'src/catalog.node.ts'\n",
+        )).unwrap();
+        assert_eq!(configured.angular.project.as_deref(), Some("store"));
+        assert_eq!(configured.angular.configuration, "development");
+        assert_eq!(
+            configured.angular.node_bootstrap.unwrap().to_str(),
+            Some("src/catalog.node.ts")
+        );
+        assert!(
+            toml::from_str::<ApplicationConfig>(&format!(
+                "{BASE}\n[angular]\nnode_bootstap = 'x'\n"
+            ))
+            .is_err()
+        );
     }
 }

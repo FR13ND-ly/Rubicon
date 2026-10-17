@@ -1,8 +1,14 @@
 import { op_demo_warmup_complete } from "ext:core/ops";
 
-Object.defineProperty(globalThis, "__rubiconDemoWarmup", {
+Object.defineProperty(globalThis, "__rubiconRenderObserver", {
     value: Object.freeze({
-        recordCompletedRender: op_demo_warmup_complete,
+        complete(request, status, ok) {
+            if (ok && status === 200 && request.method === 'GET' &&
+                new URL(request.url).pathname === '/products') {
+                return op_demo_warmup_complete();
+            }
+            return false;
+        },
     }),
     writable: false,
     configurable: false,

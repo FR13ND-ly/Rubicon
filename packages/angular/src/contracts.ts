@@ -1,4 +1,15 @@
 import type { RubiconBackend } from './backend.contracts.js';
+import type { ApplicationConfig, ApplicationRef, Type } from '@angular/core';
+import type { BootstrapContext } from '@angular/platform-browser';
+
+export interface RubiconApplication {
+  component: Type<unknown>;
+  config: ApplicationConfig;
+}
+
+export type RubiconBootstrap = (
+  context: BootstrapContext,
+) => Promise<ApplicationRef>;
 
 export interface RubiconRequest {
   request_id: string;
@@ -14,6 +25,7 @@ export interface RubiconResponse {
 }
 
 export interface RubiconServerOptions<TContext = unknown> {
+  application?: RubiconApplication;
   backend?: RubiconBackend;
 
   createRequestContext?: (
@@ -22,6 +34,8 @@ export interface RubiconServerOptions<TContext = unknown> {
 }
 
 export interface RubiconServer {
+  bootstrap: RubiconBootstrap;
+
   reqHandler(request: Request): Promise<Response | null>;
 
   render(request: RubiconRequest): Promise<RubiconResponse>;

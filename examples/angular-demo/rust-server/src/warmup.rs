@@ -125,7 +125,9 @@ mod tests {
             let mut runtime = JavaScriptRuntime::new().unwrap();
             assert_eq!(
                 runtime
-                    .execute_i64("Number(typeof globalThis.__rubiconDemoWarmup === 'undefined')")
+                    .execute_i64(
+                        "Number(typeof globalThis.__rubiconRenderObserver === 'undefined')"
+                    )
                     .unwrap(),
                 1,
             );
@@ -138,11 +140,27 @@ mod tests {
             )])
             .unwrap();
 
+            assert_eq!(
+                runtime
+                    .execute_i64(
+                        r#"
+                Number([
+                    [{ method: 'GET', url: 'http://localhost/' }, 200, true],
+                    [{ method: 'HEAD', url: 'http://localhost/products' }, 200, true],
+                    [{ method: 'GET', url: 'http://localhost/products' }, 500, true],
+                    [{ method: 'GET', url: 'http://localhost/products' }, 200, false],
+                ].every(args => !globalThis.__rubiconRenderObserver.complete(...args)))
+            "#
+                    )
+                    .unwrap(),
+                1
+            );
+
             for expected in [0, 1, 1] {
                 assert_eq!(
                     runtime
                         .execute_i64(
-                            "Number(globalThis.__rubiconDemoWarmup.recordCompletedRender())"
+                            "Number(globalThis.__rubiconRenderObserver.complete({ method: 'GET', url: 'http://localhost/products' }, 200, true))"
                         )
                         .unwrap(),
                     expected,

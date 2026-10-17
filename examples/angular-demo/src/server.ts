@@ -6,8 +6,7 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { join } from 'node:path';
-import type { ProductsRequestContext } from './app/catalog/products.contract';
-import { listProducts } from './catalog.node';
+import { listProducts, PRODUCTS_API_PATH } from './catalog.node';
 import { attachShutdown } from './shutdown.node';
 
 const configuredBrowserDir = process.env['RUBICON_BROWSER_DIR'];
@@ -21,7 +20,7 @@ const browserDistFolder = configuredBrowserDir ?? join(import.meta.dirname, '../
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
-app.get('/api/products', async (_req, res) => {
+app.get(PRODUCTS_API_PATH, async (_req, res) => {
   res.json(await listProducts());
 });
 
@@ -40,12 +39,8 @@ app.use(
  * Handle all other requests by rendering the Angular application.
  */
 app.use((req, res, next) => {
-  const context: ProductsRequestContext = {
-    products: { listProducts },
-  };
-
   angularApp
-    .handle(req, context)
+    .handle(req)
     .then((response) => (response ? writeResponseToNodeResponse(response, res) : next()))
     .catch(next);
 });
