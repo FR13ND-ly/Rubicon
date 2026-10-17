@@ -9,12 +9,21 @@ use rubicon::{Backend, JavaScriptRuntime, ServerConfig, backend_extension, serve
 #[cfg(windows)]
 use rubicon::TimerResolutionGuard;
 
+mod body_transport;
 mod catalog;
 mod shutdown;
+mod v8_memory;
 mod warmup;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    eprintln!(
+        "RUBICON_DEMO_HTTP_THREADS={}",
+        tokio::runtime::Handle::current().metrics().num_workers(),
+    );
+    v8_memory::configure_from_environment()?;
+    let body_transport = body_transport::BodyTransport::from_environment()?;
+
     #[cfg(windows)]
     let _timer_resolution = TimerResolutionGuard::from_environment()?;
 
@@ -66,7 +75,9 @@ async fn main() -> Result<(), String> {
                 extensions.push(warmup::extension(runtime_id, requests));
             }
 
-            JavaScriptRuntime::with_extensions(extensions)
+            let mut runtime = JavaScriptRuntime::with_extensions(extensions)?;
+            body_transport.configure(&mut runtime)?;
+            Ok(runtime)
         },
         shutdown,
     )

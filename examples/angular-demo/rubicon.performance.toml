@@ -1,0 +1,23 @@
+# Pool profile measured on /products with 16 VUs, text transport,
+# and RUBICON_DEMO_V8_SEMI_SPACE_MIB=16.
+[angular]
+node_bootstrap = "src/catalog.node.ts"
+
+[server]
+bind = "127.0.0.1:3000"
+origin = "http://127.0.0.1:3000"
+
+[renderer]
+workers = 4
+max_in_flight = 4
+queue_capacity = 16
+
+[rubicon]
+executable = "../../target/release/rubicon-demo-server"
+server_entry = "dist/rubicon/server/server.mjs"
+browser_dir = "dist/rubicon/browser"
+
+[node]
+executable = "node"
+server_entry = "dist/angular-demo/server/server.mjs"
+browser_dir = "dist/angular-demo/browser"
