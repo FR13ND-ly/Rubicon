@@ -16,7 +16,8 @@ use axum::{
 use tower_http::services::ServeDir;
 
 use crate::{
-    JavaScriptRuntime, RenderError, RenderRequest, Renderer, ServerConfig, into_http_response,
+    JavaScriptRuntime, RenderError, RenderRequest, Renderer, ServerConfig,
+    into_http_streaming_response,
 };
 
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
@@ -26,14 +27,6 @@ struct ServerState {
     origin: String,
 }
 
-/// Serves application routes, browser assets, and buffered GET/HEAD SSR.
-///
-/// The supplied router provides application endpoints. This function installs
-/// its fallback: browser files first, then the renderer's `render` export.
-/// The runtime factory runs on the rendering worker thread.
-///
-/// A successful shutdown notification stops accepting connections and drains
-/// active HTTP requests. A failed notification is returned to the caller.
 pub async fn serve<F, S>(
     config: ServerConfig,
     application_routes: Router,
@@ -147,9 +140,10 @@ async fn root(
         method: method.as_str().to_owned(),
         headers: request_headers(&headers)?,
     };
+    drop(headers);
 
-    match state.renderer.render(request).await {
-        Ok(rendered) => into_http_response(rendered).map_err(|error| {
+    match state.renderer.render_stream(request).await {
+        Ok(rendered) => into_http_streaming_response(rendered).map_err(|error| {
             eprintln!("Response conversion failed [request_id={request_id}]: {error}");
 
             (StatusCode::INTERNAL_SERVER_ERROR, "Rendering failed.")

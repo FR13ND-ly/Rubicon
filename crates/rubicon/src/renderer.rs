@@ -10,11 +10,16 @@ use deno_core::{
 use std::{future::poll_fn, path::PathBuf, sync::Arc, task::Poll, thread};
 use tokio::sync::oneshot;
 
-use crate::{JavaScriptRuntime, PendingExport, RenderRequest, RenderResponse, RendererConfig};
+use crate::{
+    JavaScriptRuntime, PendingExport, RenderBody, RenderContent, RenderRequest, RenderResponse,
+    RendererConfig,
+};
+
+type Reply = oneshot::Sender<Result<RenderResponse<RenderContent>, String>>;
 
 struct RenderJob {
     request: RenderRequest,
-    reply: oneshot::Sender<Result<RenderResponse, String>>,
+    reply: Reply,
 
     #[cfg(feature = "render-timing")]
     queued_at: std::time::Instant,
@@ -72,13 +77,20 @@ pub enum RenderError {
 }
 
 #[cfg(feature = "render-timing")]
-fn record_render_timing(worker_id: usize, job: &RenderJob, started: std::time::Instant, ok: bool) {
+struct RenderTiming {
+    request_id: String,
+    queued_at: std::time::Instant,
+    started: std::time::Instant,
+}
+
+#[cfg(feature = "render-timing")]
+fn record_render_timing(worker_id: usize, timing: &RenderTiming, ok: bool) {
     tracing::info!(
         target: "rubicon::render_timing",
         worker_id,
-        request_id = %job.request.request_id,
-        queue_us = started.duration_since(job.queued_at).as_micros(),
-        call_export_us = started.elapsed().as_micros(),
+        request_id = %timing.request_id,
+        queue_us = timing.started.duration_since(timing.queued_at).as_micros(),
+        call_export_us = timing.started.elapsed().as_micros(),
         ok,
         "render_timing",
     );
@@ -208,6 +220,32 @@ impl Renderer {
     }
 
     pub async fn render(&self, request: RenderRequest) -> Result<RenderResponse, RenderError> {
+        let rendered = self.render_stream(request).await?;
+        let body = match rendered.body {
+            RenderContent::Buffered(body) => body,
+            RenderContent::Stream(mut stream) => {
+                let mut bytes = Vec::new();
+                while let Some(chunk) = stream.next().await {
+                    bytes.extend_from_slice(
+                        &chunk.map_err(|error| RenderError::Failed(error.to_string()))?,
+                    );
+                }
+                RenderBody::Bytes(bytes)
+            }
+        };
+        Ok(RenderResponse {
+            status: rendered.status,
+            headers: rendered.headers,
+            body,
+        })
+    }
+
+    /// Returns headers as soon as available. Stream bodies retain their worker slot
+    /// until completion or consumer cancellation. `render` collects them instead.
+    pub async fn render_stream(
+        &self,
+        request: RenderRequest,
+    ) -> Result<RenderResponse<RenderContent>, RenderError> {
         let (reply, response) = oneshot::channel();
 
         self.sender
@@ -280,20 +318,72 @@ fn run_worker<F>(
             }
         };
 
+        let render = match runtime.prepare_renderer(module_id) {
+            Ok(function) => function,
+            Err(error) => {
+                let _ = ready.send(Err(error));
+                return;
+            }
+        };
+
         if ready.send(Ok(())).is_err() {
             return;
         }
         struct ActiveCall {
-            job: RenderJob,
-            pending: PendingExport,
+            reply: Option<Reply>,
+            pending: PendingCall,
             #[cfg(feature = "render-timing")]
-            started: std::time::Instant,
+            timing: RenderTiming,
             #[cfg(feature = "render-timing")]
             span: tracing::Span,
         }
+        enum PendingCall {
+            Render(PendingExport),
+            Stream(crate::streaming::StreamCompletion),
+        }
+        enum CallResult {
+            Render(Result<v8::Global<v8::Value>, String>),
+            Stream(Result<(), String>),
+        }
+        impl PendingCall {
+            fn poll(&mut self, cx: &mut std::task::Context<'_>) -> Poll<CallResult> {
+                match self {
+                    Self::Render(pending) => pending.as_mut().poll(cx).map(CallResult::Render),
+                    Self::Stream(pending) => std::pin::Pin::new(pending).poll(cx)
+                        .map(|result| CallResult::Stream(result.unwrap_or_else(|_| Err("Response stream stopped".to_owned())))),
+                }
+            }
+        }
+        fn launch(job: RenderJob, runtime: &mut JavaScriptRuntime,
+            render: &v8::Global<v8::Function>, _worker_id: usize) -> Option<ActiveCall> {
+            if job.reply.is_closed() { return None; }
+            #[cfg(feature = "render-timing")]
+            let span = tracing::info_span!(target: "rubicon::runtime_timing", "render",
+                worker_id = _worker_id, request_id = %job.request.request_id);
+            #[cfg(feature = "render-timing")]
+            let timing = RenderTiming { request_id: job.request.request_id.clone(),
+                queued_at: job.queued_at, started: std::time::Instant::now() };
+            #[cfg(feature = "render-timing")]
+            let launched = span.in_scope(|| runtime.begin_export(render, job.request));
+            #[cfg(not(feature = "render-timing"))]
+            let launched = runtime.begin_export(render, job.request);
+            match launched {
+                Ok(pending) => Some(ActiveCall {
+                    reply: Some(job.reply), pending: PendingCall::Render(pending),
+                    #[cfg(feature = "render-timing")] timing,
+                    #[cfg(feature = "render-timing")] span,
+                }),
+                Err(error) => {
+                    #[cfg(feature = "render-timing")]
+                    record_render_timing(_worker_id, &timing, false);
+                    let _ = job.reply.send(Err(error));
+                    None
+                }
+            }
+        }
         enum Event {
             Job(RenderJob),
-            Completed(usize, Result<v8::Global<v8::Value>, String>),
+            Completed(usize, CallResult),
             Closed,
             Quiescent,
             Failed(String),
@@ -301,9 +391,9 @@ fn run_worker<F>(
         fn poll_completed(active: &mut [ActiveCall], cx: &mut std::task::Context<'_>) -> Option<Event> {
             for (index, call) in active.iter_mut().enumerate() {
                 #[cfg(feature = "render-timing")]
-                let state = call.span.in_scope(|| call.pending.as_mut().poll(cx));
+                let state = call.span.in_scope(|| call.pending.poll(cx));
                 #[cfg(not(feature = "render-timing"))]
-                let state = call.pending.as_mut().poll(cx);
+                let state = call.pending.poll(cx);
                 if let Poll::Ready(result) = state {
                     return Some(Event::Completed(index, result));
                 }
@@ -340,53 +430,68 @@ fn run_worker<F>(
                 Poll::Pending
             }).await;
             match event {
-                Event::Job(job) => {
-                    if job.reply.is_closed() { continue; }
-                    #[cfg(feature = "render-timing")]
-                    let span = tracing::info_span!(
-                        target: "rubicon::runtime_timing", "render",
-                        worker_id,
-                        request_id = %job.request.request_id,
-                    );
-                    #[cfg(feature = "render-timing")]
-                    let started = std::time::Instant::now();
-                    #[cfg(feature = "render-timing")]
-                    let launched = span.in_scope(|| runtime.begin_export(module_id, "render", &job.request));
-                    #[cfg(not(feature = "render-timing"))]
-                    let launched = runtime.begin_export(module_id, "render", &job.request);
-                    match launched {
-                        Ok(pending) => active.push(ActiveCall {
-                            job, pending,
-                            #[cfg(feature = "render-timing")]
-                            started,
-                            #[cfg(feature = "render-timing")]
-                            span,
-                        }),
-                        Err(error) => {
-                            #[cfg(feature = "render-timing")]
-                            record_render_timing(worker_id, &job, started, false);
-                            let _ = job.reply.send(Err(error));
+                Event::Job(mut job) => {
+                    const BATCH: usize = if cfg!(feature = "renderer-batching") { 4 } else { 1 };
+                    #[cfg(feature = "renderer-batching")]
+                    let batch_started = std::time::Instant::now();
+                    for index in 0..BATCH {
+                        if let Some(call) = launch(job, &mut runtime, &render.function, worker_id) {
+                            active.push(call);
+                        }
+                        if index + 1 == BATCH || active.len() >= max_in_flight { break; }
+                        #[cfg(feature = "renderer-batching")]
+                        if batch_started.elapsed() >= std::time::Duration::from_millis(1) { break; }
+                        match receiver.try_recv() {
+                            Ok(next) => job = next,
+                            Err(async_channel::TryRecvError::Empty) => break,
+                            Err(async_channel::TryRecvError::Closed) => { closed = true; break; }
                         }
                     }
                 }
                 Event::Completed(index, result) => {
-                    let call = active.swap_remove(index);
+                    let mut call = active.swap_remove(index);
+                    let CallResult::Render(result) = result else {
+                        if let CallResult::Stream(result) = result {
+                            #[cfg(feature = "render-timing")]
+                            record_render_timing(worker_id, &call.timing, result.is_ok());
+                            #[cfg(not(feature = "render-timing"))]
+                            let _ = result;
+                        }
+                        continue;
+                    };
+                    let wanted = call.reply.as_ref().is_some_and(|reply| !reply.is_closed());
                     #[cfg(feature = "render-timing")]
-                    let response = call.span.in_scope(|| result.and_then(|value| runtime.convert_result(value)));
+                    let response = call.span.in_scope(|| result.and_then(|value| runtime.convert_render_response(value, wanted, &render)));
                     #[cfg(not(feature = "render-timing"))]
-                    let response = result.and_then(|value| runtime.convert_result(value));
+                    let response = result.and_then(|value| runtime.convert_render_response(value, wanted, &render));
+                    match response {
+                        Ok(Some((response, Some(completion)))) => {
+                            if let Some(reply) = call.reply.take() { let _ = reply.send(Ok(response)); }
+                            call.pending = PendingCall::Stream(completion);
+                            active.push(call);
+                            continue;
+                        }
+                        response => {
                     #[cfg(feature = "render-timing")]
-                    record_render_timing(worker_id, &call.job, call.started, response.is_ok());
-                    let _ = call.job.reply.send(response);
+                    record_render_timing(worker_id, &call.timing, response.is_ok());
+                            if let Some(reply) = call.reply {
+                                match response {
+                                    Ok(Some((response, None))) => { let _ = reply.send(Ok(response)); }
+                                    Err(error) => { let _ = reply.send(Err(error)); }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
                 }
                 Event::Closed => closed = true,
                 Event::Quiescent => {
                     for call in active.drain(..) {
                         #[cfg(feature = "render-timing")]
-                        record_render_timing(worker_id, &call.job, call.started, false);
-                        let _ = call.job.reply.send(Err(
+                        record_render_timing(worker_id, &call.timing, false);
+                        if let Some(reply) = call.reply { let _ = reply.send(Err(
                             "Export execution failed: Promise resolution is still pending but the event loop has already resolved".to_owned(),
-                        ));
+                        )); }
                     }
                 }
                 Event::Failed(error) => {
@@ -449,10 +554,13 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .unwrap();
+            let crate::RenderContent::Buffered(body) = response.body else {
+                panic!("Expected buffered fixture response");
+            };
             if id == "drain-state" {
-                assert_eq!(response.body, "2|2");
+                assert_eq!(body, "2|2");
             } else {
-                assert!(response.body.starts_with(id));
+                assert!(body.as_bytes().starts_with(id.as_bytes()));
             }
         }
     }

@@ -88,14 +88,41 @@ impl BrowserAssets {
         ));
         std::fs::create_dir(&directory).unwrap();
         let assets = Self(directory);
-        std::fs::write(assets.0.join("test.css"), "body { color: red; }").unwrap();
+        std::fs::create_dir(assets.0.join("assets")).unwrap();
+        std::fs::create_dir(assets.0.join("api")).unwrap();
+        for (name, body) in [
+            ("test.css", "body { color: red; }"),
+            ("download", "extensionless asset"),
+            ("space name.css", "space asset"),
+            ("țară.css", "unicode asset"),
+            ("percent%20.css", "literal percent asset"),
+            ("assets/nested.css", "nested asset"),
+            (
+                "api/test",
+                "static route must not override application route",
+            ),
+        ] {
+            std::fs::write(assets.0.join(name), body).unwrap();
+        }
         assets
     }
 }
 
 impl Drop for BrowserAssets {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(self.0.join("test.css"));
+        for name in [
+            "test.css",
+            "download",
+            "space name.css",
+            "țară.css",
+            "percent%20.css",
+            "assets/nested.css",
+            "api/test",
+        ] {
+            let _ = std::fs::remove_file(self.0.join(name));
+        }
+        let _ = std::fs::remove_dir(self.0.join("assets"));
+        let _ = std::fs::remove_dir(self.0.join("api"));
         let _ = std::fs::remove_dir(&self.0);
     }
 }
@@ -197,6 +224,43 @@ async fn serves_application_routes_assets_ssr_and_shuts_down() {
     );
     assert!(body.contains("body { color: red; }"));
 
+    let etag = headers
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("etag")
+                .then(|| value.trim().to_owned())
+        })
+        .expect("Static assets must preserve conditional HTTP support");
+    let (status, _, body) = request(
+        address,
+        "GET",
+        "/test.css",
+        &format!("If-None-Match: {etag}\r\n"),
+    )
+    .await;
+    assert_eq!(status, 304);
+    assert!(body.is_empty());
+    let (status, _, body) = request(address, "GET", "/test.css", "Range: bytes=0-3\r\n").await;
+    assert_eq!(status, 206);
+    assert_eq!(body, "body");
+    let (status, headers, body) = request(address, "HEAD", "/test.css", "").await;
+    assert_eq!(status, 200);
+    assert!(body.is_empty());
+    assert!(headers.to_ascii_lowercase().contains("content-length: 20"));
+    for (path, expected) in [
+        ("/download?version=1", "extensionless asset"),
+        ("/space%20name.css", "space asset"),
+        ("/%C8%9Bar%C4%83.css", "unicode asset"),
+        ("/percent%2520.css", "literal percent asset"),
+        ("/assets%2Fnested.css", "nested asset"),
+        ("/%74est.css", "body { color: red; }"),
+    ] {
+        let (status, _, body) = request(address, "GET", path, "").await;
+        assert_eq!(status, 200, "Static asset failed: {path}");
+        assert_eq!(body, expected, "Static asset changed: {path}");
+    }
+
     let path = "/products?q=rust&lang=ro";
     let (status, headers, body) = request(
         address,
@@ -226,6 +290,178 @@ async fn serves_application_routes_assets_ssr_and_shuts_down() {
         .expect("Server task panicked")
         .expect("Server failed during shutdown");
     TcpListener::bind(address).expect("Shutdown must release the listening port");
+}
+
+#[tokio::test]
+async fn binary_ssr_preserves_utf8_cookies_and_head_semantics() {
+    let reserved = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = reserved.local_addr().unwrap();
+    let config = ServerConfig {
+        bind: address,
+        origin: format!("http://{address}"),
+        server_entry: Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/renderer_binary.mjs"),
+        browser_dir: Path::new(env!("CARGO_MANIFEST_DIR")).join("js"),
+        renderer: Default::default(),
+    };
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    drop(reserved);
+    let server = tokio::spawn(serve(
+        config,
+        Router::new(),
+        JavaScriptRuntime::new,
+        async {
+            receiver
+                .await
+                .map_err(|_| "Shutdown sender dropped".to_owned())
+        },
+    ));
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            assert!(
+                !server.is_finished(),
+                "Binary HTTP server exited before readiness"
+            );
+            if tokio::net::TcpStream::connect(address).await.is_ok() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let expected = "<p>țară 🌍</p>";
+    let (status, headers, body) = request(address, "GET", "/utf8", "").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, expected);
+    assert_eq!(
+        headers.to_ascii_lowercase().matches("set-cookie:").count(),
+        2
+    );
+    let (status, headers, body) = request(address, "HEAD", "/utf8", "").await;
+    assert_eq!(status, 200);
+    assert!(body.is_empty());
+    assert!(
+        headers
+            .to_ascii_lowercase()
+            .contains(&format!("content-length: {}", expected.len()))
+    );
+    sender.send(()).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), server)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    TcpListener::bind(address).expect("Binary server must release its port");
+}
+
+#[tokio::test]
+#[cfg(feature = "streaming")]
+async fn streamed_http_delivers_chunks_cookies_and_cancels_head() {
+    use std::io::{BufRead, BufReader};
+    fn chunk(reader: &mut BufReader<TcpStream>) -> Vec<u8> {
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        let length = usize::from_str_radix(line.trim(), 16).unwrap();
+        assert!(length <= 65536);
+        let mut bytes = vec![0; length];
+        reader.read_exact(&mut bytes).unwrap();
+        let mut end = [0; 2];
+        reader.read_exact(&mut end).unwrap();
+        assert_eq!(&end, b"\r\n");
+        bytes
+    }
+    let reserved = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = reserved.local_addr().unwrap();
+    let config = ServerConfig {
+        bind: address,
+        origin: format!("http://{address}"),
+        server_entry: Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/renderer_streaming.mjs"),
+        browser_dir: Path::new(env!("CARGO_MANIFEST_DIR")).join("js"),
+        renderer: RendererConfig {
+            workers: 1,
+            max_in_flight: 2,
+            queue_capacity: 16,
+        },
+    };
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    drop(reserved);
+    let server = tokio::spawn(serve(
+        config,
+        Router::new(),
+        JavaScriptRuntime::new,
+        async {
+            receiver
+                .await
+                .map_err(|_| "Shutdown sender dropped".to_owned())
+        },
+    ));
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            assert!(!server.is_finished());
+            if tokio::net::TcpStream::connect(address).await.is_ok() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let mut reader = tokio::task::spawn_blocking(move || {
+        let mut connection = TcpStream::connect_timeout(&address, Duration::from_secs(5)).unwrap();
+        connection
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        connection
+            .set_write_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        connection
+            .write_all(
+                format!("GET /delayed HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n")
+                    .as_bytes(),
+            )
+            .unwrap();
+        let mut reader = BufReader::new(connection);
+        let mut headers = String::new();
+        loop {
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            if line == "\r\n" {
+                break;
+            }
+            assert!(!line.is_empty());
+            headers.push_str(&line);
+            assert!(headers.len() < 65536);
+        }
+        assert!(headers.starts_with("HTTP/1.1 200"));
+        let headers = headers.to_ascii_lowercase();
+        assert_eq!(headers.matches("set-cookie:").count(), 2);
+        assert!(headers.contains("transfer-encoding: chunked"));
+        assert!(!headers.contains("content-length:"));
+        assert_eq!(chunk(&mut reader), "<p>țară ".as_bytes());
+        reader
+    })
+    .await
+    .unwrap();
+    assert_eq!(request(address, "GET", "/release", "").await.2, "released");
+    tokio::task::spawn_blocking(move || {
+        assert_eq!(chunk(&mut reader), "🌍</p>".as_bytes());
+        assert!(chunk(&mut reader).is_empty());
+    })
+    .await
+    .unwrap();
+    let (status, headers, body) = request(address, "HEAD", "/delayed", "").await;
+    assert_eq!(status, 200);
+    assert!(body.is_empty());
+    assert!(!headers.to_ascii_lowercase().contains("content-length:"));
+    sender.send(()).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), server)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    TcpListener::bind(address).expect("Streaming server must release its port");
 }
 
 #[tokio::test]

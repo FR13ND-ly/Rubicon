@@ -64,6 +64,8 @@ async fn check_renderer_idle_timers() -> Result<(), String> {
 
     let (cleanup, ticks) = inspected
         .body
+        .as_text()
+        .expect("Timer response should be UTF-8")
         .split_once('|')
         .expect("Invalid timer test response");
 

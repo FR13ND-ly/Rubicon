@@ -6,6 +6,8 @@ edition = "2024"
 [features]
 default = []
 render-timing = ["dep:tracing"]
+renderer-batching = []
+streaming = []
 
 [dependencies]
 axum = "=0.8.9"

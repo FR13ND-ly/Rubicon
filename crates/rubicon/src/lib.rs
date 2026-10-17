@@ -27,22 +27,37 @@ mod request;
 mod response;
 mod server;
 mod static_files;
+mod streaming;
 
 #[cfg(windows)]
 mod windows_timer;
 
 pub use config::{RendererConfig, ServerConfig};
-pub use http_response::into_http_response;
+pub use http_response::{into_http_response, into_http_streaming_response};
 pub use renderer::{RenderError, Renderer};
 pub use request::RenderRequest;
-pub use response::RenderResponse;
+pub use response::{RenderBody, RenderContent, RenderResponse};
 pub use server::serve;
+pub use streaming::RenderStream;
 
 #[cfg(windows)]
 pub use windows_timer::TimerResolutionGuard;
 
 pub(crate) type PendingExport =
     Pin<Box<dyn Future<Output = Result<v8::Global<v8::Value>, String>>>>;
+pub(crate) type PreparedResponse = (
+    RenderResponse<RenderContent>,
+    Option<streaming::StreamCompletion>,
+);
+pub(crate) struct RenderBridge {
+    pub(crate) function: v8::Global<v8::Function>,
+    #[cfg(feature = "streaming")]
+    open: v8::Global<v8::Function>,
+    #[cfg(feature = "streaming")]
+    cancel: v8::Global<v8::Function>,
+    #[cfg(feature = "streaming")]
+    body_key: v8::Global<v8::String>,
+}
 
 pub struct JavaScriptRuntime {
     inner: JsRuntime,
@@ -68,6 +83,9 @@ impl JavaScriptRuntime {
             deno_fetch::deno_fetch::init(Default::default()),
             rubicon_web::init(),
         ];
+
+        #[cfg(feature = "streaming")]
+        extensions.push(streaming::extension());
 
         #[cfg(feature = "render-timing")]
         extensions.push(diagnostics::extension());
@@ -228,16 +246,27 @@ impl JavaScriptRuntime {
 
     pub(crate) fn begin_export<TArgument: serde::Serialize>(
         &mut self,
-        module_id: ModuleId,
-        export_name: &str,
-        argument: &TArgument,
+        function: &v8::Global<v8::Function>,
+        argument: TArgument,
     ) -> Result<PendingExport, String> {
-        let (function, argument) = self.prepare_export(module_id, export_name, argument)?;
+        #[cfg(feature = "render-timing")]
+        let prepare_started = std::time::Instant::now();
+        let serialized = {
+            deno_core::scope!(scope, &mut self.inner);
+            let argument = serde_v8::to_v8(scope, &argument)
+                .map_err(|error| format!("Argument conversion failed: {error}"))?;
+            v8::Global::new(scope, argument)
+        };
+        drop(argument);
+        #[cfg(feature = "render-timing")]
+        tracing::info!(target: "rubicon::runtime_timing", stage = "prepare",
+            elapsed_us = prepare_started.elapsed().as_micros(), ok = true,
+            "runtime_stage_timing");
         #[cfg(feature = "render-timing")]
         let execute_started = std::time::Instant::now();
         // call_with_args starts the export now; its owned future is completed by
         // later event-loop polls without retaining a mutable runtime borrow.
-        let future = self.inner.call_with_args(&function, &[argument]);
+        let future = self.inner.call_with_args(function, &[serialized]);
         Ok(Box::pin(async move {
             let result = future
                 .await
@@ -252,6 +281,167 @@ impl JavaScriptRuntime {
             );
             result
         }))
+    }
+
+    pub(crate) fn resolve_export(
+        &mut self,
+        module_id: ModuleId,
+        name: &str,
+    ) -> Result<v8::Global<v8::Function>, String> {
+        let namespace = self
+            .inner
+            .get_module_namespace(module_id)
+            .map_err(|error| format!("Module namespace access failed: {error}"))?;
+        deno_core::scope!(scope, &mut self.inner);
+        let namespace = v8::Local::new(scope, namespace);
+        let key =
+            v8::String::new(scope, name).ok_or_else(|| "Cannot allocate export name".to_owned())?;
+        let value = namespace
+            .get(scope, key.into())
+            .ok_or_else(|| format!("Cannot read export: {name}"))?;
+        let function = v8::Local::<v8::Function>::try_from(value)
+            .map_err(|_| format!("Export {name} must be a function"))?;
+        Ok(v8::Global::new(scope, function))
+    }
+
+    pub(crate) fn prepare_renderer(&mut self, module_id: ModuleId) -> Result<RenderBridge, String> {
+        let render = self.resolve_export(module_id, "render")?;
+        #[cfg(not(feature = "streaming"))]
+        return Ok(RenderBridge { function: render });
+        #[cfg(feature = "streaming")]
+        {
+            let open = self
+                .inner
+                .execute_script("rubicon-stream-open.js", "globalThis.__rubiconOpenStream")
+                .map_err(|error| format!("Renderer bridge initialization failed: {error}"))?;
+            let cancel = self
+                .inner
+                .execute_script(
+                    "rubicon-stream-cancel.js",
+                    "globalThis.__rubiconCancelStream",
+                )
+                .map_err(|error| format!("Renderer bridge initialization failed: {error}"))?;
+            deno_core::scope!(scope, &mut self.inner);
+            let open = v8::Local::<v8::Function>::try_from(v8::Local::new(scope, open))
+                .map_err(|_| "Renderer bridge must be a function".to_owned())?;
+            let cancel = v8::Local::<v8::Function>::try_from(v8::Local::new(scope, cancel))
+                .map_err(|_| "Renderer bridge must be a function".to_owned())?;
+            let body_key = v8::String::new(scope, "body").ok_or("Cannot allocate body key")?;
+            Ok(RenderBridge {
+                function: render,
+                open: v8::Global::new(scope, open),
+                cancel: v8::Global::new(scope, cancel),
+                body_key: v8::Global::new(scope, body_key),
+            })
+        }
+    }
+
+    #[cfg(not(feature = "streaming"))]
+    pub(crate) fn convert_render_response(
+        &mut self,
+        value: v8::Global<v8::Value>,
+        wanted: bool,
+        _bridge: &RenderBridge,
+    ) -> Result<Option<PreparedResponse>, String> {
+        if !wanted {
+            return Ok(None);
+        }
+        let response: RenderResponse = self.convert_result(value)?;
+        Ok(Some((
+            RenderResponse {
+                status: response.status,
+                headers: response.headers,
+                body: RenderContent::Buffered(response.body),
+            },
+            None,
+        )))
+    }
+
+    #[cfg(feature = "streaming")]
+    pub(crate) fn convert_render_response(
+        &mut self,
+        value: v8::Global<v8::Value>,
+        wanted: bool,
+        bridge: &RenderBridge,
+    ) -> Result<Option<PreparedResponse>, String> {
+        #[derive(serde::Deserialize)]
+        struct Metadata {
+            status: u16,
+            headers: Vec<(String, String)>,
+        }
+        enum Body {
+            Buffered(RenderBody),
+            Stream(u32),
+        }
+        #[cfg(feature = "render-timing")]
+        let started = std::time::Instant::now();
+        let converted = (|| {
+            let (metadata, body) = {
+                deno_core::scope!(scope, &mut self.inner);
+                v8::tc_scope!(let scope, scope);
+                let local = v8::Local::new(scope, value);
+                let object = v8::Local::<v8::Object>::try_from(local)
+                    .map_err(|_| "Result conversion failed: expected response object".to_owned())?;
+                let metadata: Option<Metadata> = if wanted {
+                    Some(
+                        serde_v8::from_v8(scope, local)
+                            .map_err(|error| format!("Result conversion failed: {error}"))?,
+                    )
+                } else {
+                    None
+                };
+                let key = v8::Local::new(scope, &bridge.body_key);
+                let body = object
+                    .get(scope, key.into())
+                    .ok_or("Result conversion failed: cannot read response body")?;
+                let buffered =
+                    body.is_string() || body.is_array_buffer() || body.is_array_buffer_view();
+                if !wanted {
+                    if !buffered {
+                        let cancel = v8::Local::new(scope, &bridge.cancel);
+                        let receiver = v8::undefined(scope).into();
+                        let _ = cancel.call(scope, receiver, &[body]);
+                    }
+                    return Ok(None);
+                }
+                let body = if buffered {
+                    Body::Buffered(
+                        serde_v8::from_v8(scope, body)
+                            .map_err(|error| format!("Result conversion failed: {error}"))?,
+                    )
+                } else {
+                    let open = v8::Local::new(scope, &bridge.open);
+                    let receiver = v8::undefined(scope).into();
+                    let id = open
+                        .call(scope, receiver, &[body])
+                        .and_then(|value| value.uint32_value(scope))
+                        .ok_or("Result conversion failed: cannot open response stream")?;
+                    Body::Stream(id)
+                };
+                (metadata.expect("Wanted responses have metadata"), body)
+            };
+            let (body, completion) = match body {
+                Body::Stream(id) => {
+                    let (stream, completion) = streaming::take(&mut self.inner, id)?;
+                    (RenderContent::Stream(stream), Some(completion))
+                }
+                Body::Buffered(body) => (RenderContent::Buffered(body), None),
+            };
+            Ok(Some((
+                RenderResponse {
+                    status: metadata.status,
+                    headers: metadata.headers,
+                    body,
+                },
+                completion,
+            )))
+        })();
+        #[cfg(feature = "render-timing")]
+        if wanted {
+            tracing::info!(target: "rubicon::runtime_timing", stage = "convert",
+                elapsed_us = started.elapsed().as_micros(), ok = converted.is_ok(), "runtime_stage_timing");
+        };
+        converted
     }
 
     pub(crate) fn convert_result<TResult: serde::de::DeserializeOwned>(
@@ -289,6 +479,57 @@ impl JavaScriptRuntime {
 #[cfg(test)]
 mod tests {
     use super::JavaScriptRuntime;
+    use deno_core::OpState;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    #[deno_core::op2(fast)]
+    fn op_rust_argument_was_dropped(state: &mut OpState) -> bool {
+        state.borrow::<Arc<AtomicBool>>().load(Ordering::SeqCst)
+    }
+
+    deno_core::extension!(argument_drop_probe,
+        ops = [op_rust_argument_was_dropped],
+        options = { dropped: Arc<AtomicBool>, },
+        state = |state, options| { state.put(options.dropped); },
+    );
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn owned_arguments_are_released_before_synchronous_javascript_runs() -> Result<(), String>
+    {
+        #[derive(serde::Serialize)]
+        struct Argument {
+            value: i64,
+            #[serde(skip)]
+            dropped: Arc<AtomicBool>,
+        }
+        impl Drop for Argument {
+            fn drop(&mut self) {
+                self.dropped.store(true, Ordering::SeqCst);
+            }
+        }
+        let dropped = Arc::new(AtomicBool::new(false));
+        let mut runtime = JavaScriptRuntime::with_extensions(vec![argument_drop_probe::init(
+            Arc::clone(&dropped),
+        )])?;
+        let function = runtime.inner.execute_script("argument-drop-probe.js",
+            "(argument) => { if (!Deno.core.ops.op_rust_argument_was_dropped()) throw new Error('Rust argument retained'); return argument.value; }")
+            .map_err(|error| error.to_string())?;
+        let function = {
+            deno_core::scope!(scope, &mut runtime.inner);
+            let function = deno_core::v8::Local::new(scope, function);
+            let function =
+                deno_core::v8::Local::<deno_core::v8::Function>::try_from(function).unwrap();
+            deno_core::v8::Global::new(scope, function)
+        };
+        let result = runtime
+            .begin_export(&function, Argument { value: 7, dropped })?
+            .await?;
+        assert_eq!(runtime.convert_result::<i64>(result)?, 7);
+        Ok(())
+    }
 
     #[tokio::test(flavor = "current_thread")]
     async fn runtime_recovers_after_execution_and_conversion_errors() -> Result<(), String> {

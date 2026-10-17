@@ -33,7 +33,7 @@ fn spawn(
 }
 async fn state(renderer: &Renderer) -> (usize, usize) {
     let response = call(renderer, "state", "/state").await.unwrap();
-    let (active, maximum) = response.body.split_once('|').unwrap();
+    let (active, maximum) = response.body.as_text().unwrap().split_once('|').unwrap();
     (active.parse().unwrap(), maximum.parse().unwrap())
 }
 async fn wait_active(renderer: &Renderer, expected: usize) {
