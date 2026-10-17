@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { buildAngular } from '../build.mjs';
+import { integrateAngular } from '../integrate.mjs';
 
 const demo = fileURLToPath(new URL('../../../examples/angular-demo/', import.meta.url));
 const hash = async path => createHash('sha256').update(await readFile(resolve(demo, path))).digest('hex');
@@ -51,4 +52,59 @@ test('single-entry builds preserve Angular sources; Node SSR uses its direct ada
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('integration inspects an Angular workspace and preserves all existing application files', { timeout: 30_000 }, async t => {
+  const parent = resolve(demo, 'target');
+  await mkdir(parent, { recursive: true });
+  const cwd = await mkdtemp(join(parent, 'rb-integrate-'));
+  t.after(async () => {
+    assert.equal(dirname(resolve(cwd)), parent);
+    await rm(cwd, { recursive: true, force: true });
+  });
+  const source = join(cwd, 'projects/shop/src');
+  await mkdir(source, { recursive: true });
+  const application = { projectType: 'application', root: 'projects/shop', sourceRoot: 'projects/shop/src', architect: {
+    build: { builder: '@angular/build:application', defaultConfiguration: 'production', configurations: { production: {} },
+      options: { server: 'projects/shop/src/main.server.ts', ssr: { entry: 'projects/shop/src/server.ts' },
+        tsConfig: 'projects/shop/tsconfig.app.json', outputPath: 'dist/shop' } },
+  } };
+  const workspace = { version: 1, projects: { shop: application } };
+  const angularPath = join(cwd, 'angular.json');
+  const saveWorkspace = () => writeFile(angularPath, JSON.stringify(workspace));
+  await saveWorkspace();
+  await writeFile(join(cwd, 'package.json'), '{"private":true}');
+  await writeFile(join(cwd, 'projects/shop/tsconfig.app.json'), '{}');
+  await writeFile(join(source, 'main.server.ts'), `import { bootstrapApplication, BootstrapContext } from '@angular/platform-browser';
+import { Root } from './app';
+import { config } from './config';
+export default (context: BootstrapContext) => bootstrapApplication(Root, config, context);`);
+  await writeFile(join(source, 'server.ts'), '// existing Node server\n');
+  const protectedPaths = [angularPath, join(source, 'main.server.ts'), join(source, 'server.ts')];
+  const before = await Promise.all(protectedPaths.map(path => readFile(path, 'utf8')));
+  const options = { cwd, backendPath: resolve(demo, 'rust-server') };
+  const plan = await integrateAngular({ ...options, dryRun: true });
+  assert.ok(plan.files.every(file => file.action === 'create'));
+  assert.deepEqual((await readdir(source)).sort(), ['main.server.ts', 'server.ts']);
+  const result = await integrateAngular(options);
+  assert.equal(result.project, 'shop');
+  const config = await readFile(result.configPath, 'utf8');
+  assert.match(config, /entry = "\.\/src\/server.rubicon.ts"/);
+  assert.match(config, /\.\.\/\.\.\/dist\/shop\/server\/server.mjs/);
+  assert.ok((await integrateAngular(options)).files.every(file => file.action === 'unchanged'));
+  assert.deepEqual(await Promise.all(protectedPaths.map(path => readFile(path, 'utf8'))), before);
+  workspace.projects.other = structuredClone(application);
+  await saveWorkspace();
+  await assert.rejects(integrateAngular(options), /--project/);
+  assert.equal((await integrateAngular({ ...options, project: 'shop' })).project, 'shop');
+  workspace.projects.other.projectType = 'library';
+  await saveWorkspace();
+  await assert.rejects(integrateAngular({ ...options, project: 'other' }), /--project/);
+  application.architect.build.options.ssr = false;
+  await saveWorkspace();
+  await assert.rejects(integrateAngular({ ...options, project: 'shop' }), /Enable Angular SSR first/);
+  application.architect.build.options.ssr = { entry: 'projects/shop/src/server.ts' };
+  application.architect.build.options.outputPath = { base: 'dist/shop', server: 'custom-server' };
+  await saveWorkspace();
+  await assert.rejects(integrateAngular({ ...options, project: 'shop' }), /standard browser and server/);
 });

@@ -11,8 +11,32 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Connect an Angular SSR application to an existing Rubicon Rust server.
+    Integrate(IntegrateArgs),
     Build(BuildArgs),
     Serve(ServeArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct IntegrateArgs {
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Cargo project for an existing Rubicon server"
+    )]
+    pub backend_path: PathBuf,
+    #[arg(
+        long,
+        help = "Angular application in a workspace with multiple projects"
+    )]
+    pub project: Option<String>,
+    #[arg(
+        long,
+        help = "Rust binary target when the backend has multiple executables"
+    )]
+    pub bin: Option<String>,
+    #[arg(long, help = "Show the integration plan without creating files")]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]

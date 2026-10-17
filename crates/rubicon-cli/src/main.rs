@@ -2,6 +2,7 @@ mod args;
 mod build;
 mod config;
 mod control;
+mod integrate;
 mod launcher;
 
 use clap::Parser;
@@ -13,6 +14,9 @@ async fn main() -> Result<(), String> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Integrate(options) => {
+            return launcher::run(integrate::prepare(&options)?, false).await;
+        }
         Commands::Build(options) => {
             let application = config::load(&options.config)?;
             let command = build::prepare(&application, &options)?;

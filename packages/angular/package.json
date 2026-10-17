@@ -7,10 +7,13 @@
   "files": [
     "dist",
     "build.mjs",
-    "build-options.mjs"
+    "build-options.mjs",
+    "integrate.mjs",
+    "integrate-bootstrap.mjs"
   ],
   "exports": {
     "./build": "./build.mjs",
+    "./integrate": "./integrate.mjs",
     "./server": {
       "types": "./dist/server.d.ts",
       "default": "./dist/server.js"

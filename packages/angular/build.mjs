@@ -46,7 +46,7 @@ async function canonicalOutput(path) {
   }
 }
 
-async function validateOutput(workspaceRoot, output, projects) {
+export async function validateOutput(workspaceRoot, output, projects) {
   const destination = await canonicalOutput(output);
   if (destination === workspaceRoot || !inside(workspaceRoot, destination)) {
     throw new Error('Angular output must be a separate directory inside the workspace');
@@ -65,8 +65,7 @@ async function validateOutput(workspaceRoot, output, projects) {
   }
 }
 
-/** Builds through Angular Architect; application source/configuration files are never rewritten. */
-export async function buildAngular(options = {}) {
+export async function loadAngularWorkspace(options = {}) {
   options.signal?.throwIfAborted();
   const cwd = resolve(options.cwd ?? process.cwd());
   const workspaceRoot = await workspaceDirectory(cwd);
@@ -85,7 +84,7 @@ export async function buildAngular(options = {}) {
     .filter(([, project]) => project.extensions.projectType === 'application');
   const projectName = options.project ?? (applications.length === 1 ? applications[0][0] : undefined);
   const project = projectName && workspace.projects.get(projectName);
-  if (!project) throw new Error('Select an Angular application with --project');
+  if (!project || project.extensions.projectType !== 'application') throw new Error('Select an Angular application with --project');
 
   const buildTarget = project.targets.get('build');
   if (!buildTarget || ![
@@ -94,6 +93,15 @@ export async function buildAngular(options = {}) {
   ].includes(buildTarget.builder)) {
     throw new Error('Rubicon requires the Angular application builder');
   }
+  const host = new WorkspaceNodeModulesArchitectHost(workspace, workspaceRoot);
+  return { cwd, workspaceRoot, require, ts, workspace, projectName, project, buildTarget,
+    host, schema, logging, Architect };
+}
+
+/** Builds through Angular Architect; application source/configuration files are never rewritten. */
+export async function buildAngular(options = {}) {
+  const { cwd, workspaceRoot, ts, workspace, projectName, project, buildTarget,
+    host, schema, logging, Architect, require } = await loadAngularWorkspace(options);
   const backend = options.backend ?? 'rubicon';
   if (backend !== 'rubicon' && backend !== 'node') throw new Error(`Unknown backend: '${backend}'`);
   const target = {
@@ -101,7 +109,6 @@ export async function buildAngular(options = {}) {
     target: 'build',
     configuration: options.configuration ?? buildTarget.defaultConfiguration ?? 'production',
   };
-  const host = new WorkspaceNodeModulesArchitectHost(workspace, workspaceRoot);
   const configured = await host.getOptionsForTarget(target);
   if (!configured || typeof configured.tsConfig !== 'string') {
     throw new Error('Angular build must configure tsConfig');

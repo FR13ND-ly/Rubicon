@@ -78,15 +78,15 @@ pub async fn run(command: Command, managed: bool) -> Result<(), String> {
             child
                 .kill()
                 .await
-                .map_err(|error| format!("Server cleanup failed: {error}"))?;
+                .map_err(|error| format!("Process cleanup failed: {error}"))?;
 
-            return Err("Server control pipe was not created.".to_owned());
+            return Err("Process control pipe was not created.".to_owned());
         }
     };
 
     let status = tokio::select! {
         result = child.wait() => {
-            result.map_err(|error| format!("Server wait failed: {error}"))?
+            result.map_err(|error| format!("Process wait failed: {error}"))?
         }
 
         signal_result = shutdown => {
@@ -99,17 +99,17 @@ pub async fn run(command: Command, managed: bool) -> Result<(), String> {
             .await
             {
                 Ok(result) => {
-                    result.map_err(|error| format!("Server wait failed: {error}"))?
+                    result.map_err(|error| format!("Process wait failed: {error}"))?
                 }
 
                 Err(_) => {
                     child
                         .kill()
                         .await
-                        .map_err(|error| format!("Forced server shutdown failed: {error}"))?;
+                        .map_err(|error| format!("Forced process shutdown failed: {error}"))?;
 
                     return Err(
-                        "Server shutdown exceeded 10 seconds; the process was terminated."
+                        "Process shutdown exceeded 10 seconds; the process was terminated."
                             .to_owned(),
                     );
                 }
@@ -123,7 +123,7 @@ pub async fn run(command: Command, managed: bool) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err(format!("Server exited unsuccessfully: {status}"))
+        Err(format!("Process exited unsuccessfully: {status}"))
     }
 }
 
