@@ -20,6 +20,8 @@ deno_core::extension!(
 #[cfg(feature = "render-timing")]
 mod diagnostics;
 
+mod backend;
+mod backend_native;
 mod config;
 mod http_response;
 mod renderer;
@@ -32,6 +34,8 @@ mod streaming;
 #[cfg(windows)]
 mod windows_timer;
 
+pub use backend::Backend;
+pub use backend_native::backend_extension;
 pub use config::{RendererConfig, ServerConfig};
 pub use http_response::{into_http_response, into_http_streaming_response};
 pub use renderer::{RenderError, Renderer};
