@@ -26,6 +26,7 @@ mod renderer;
 mod request;
 mod response;
 mod server;
+mod static_files;
 
 #[cfg(windows)]
 mod windows_timer;

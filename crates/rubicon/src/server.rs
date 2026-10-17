@@ -52,6 +52,13 @@ where
     let cleanup = renderer.clone();
 
     let server_result = async move {
+        let browser_dir = config.browser_dir.clone();
+        let static_backend = tokio::task::spawn_blocking(move || {
+            crate::static_files::IndexedBackend::new(browser_dir)
+        })
+        .await
+        .map_err(|error| format!("Static asset indexing failed: {error}"))?;
+
         let state = Arc::new(ServerState {
             renderer,
             origin: config.origin,
@@ -63,7 +70,7 @@ where
             .with_state(Arc::clone(&state));
 
         let app = application_routes.fallback_service(
-            ServeDir::new(config.browser_dir)
+            ServeDir::with_backend(config.browser_dir, static_backend)
                 .append_index_html_on_directories(false)
                 .fallback(ssr),
         );
